@@ -75,7 +75,8 @@ jobs:
             TAG="v1.63-stage66"
           fi
           if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --prerelease=false --latest
             gh release upload "$TAG" dist/* --clobber
           else
-            gh release create "$TAG" dist/* --title "PS3 PSU Manager $TAG" --notes "Automated PS3DEV/PSL1GHT build: unencrypted ELF, CFW-compatible SELF and installable PKG. Development build; test on hardware with backups." --prerelease --target "$GITHUB_SHA"
+            gh release create "$TAG" dist/* --latest --title "PS3 PSU Manager $TAG" --notes "Automated PS3DEV/PSL1GHT build: unencrypted ELF, CFW-compatible SELF and installable PKG. Development build; test on hardware with backups." --target "$GITHUB_SHA"
           fi
