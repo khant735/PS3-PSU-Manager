@@ -1,0 +1,38 @@
+name: Publish successful Build 2 as stable release
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-build-2.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Retrieve verified Build 2 artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          gh api -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/actions/artifacts/12170273058/zip" > build2.zip
+          unzip -o build2.zip -d dist
+          test -s dist/PS3-PSU-Manager-v1.63.elf
+          test -s dist/PS3-PSU-Manager-v1.63.self
+          test -s dist/PS3-PSU-Manager-v1.63.pkg
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+      - name: Publish v1.63 stable release from Build 2
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          TAG=v1.63
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --prerelease=false --latest
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --target 33e63798f9a417563c4420f93a6a2cccb7179b46 --title "PS3 PSU Manager v1.63 (Build 2)" --notes "Stable GitHub release of successful GitHub Actions Build 2 (run 39218117221). Includes unencrypted ELF, PS3 SELF, installable PKG, and SHA-256 checksums. Compilation and packaging succeeded; real PS3 hardware and live GameFAQs downloads remain unverified." --latest
+          fi
