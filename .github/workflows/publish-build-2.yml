@@ -26,6 +26,25 @@ jobs:
           test -s dist/PS3-PSU-Manager-v1.63.self
           test -s dist/PS3-PSU-Manager-v1.63.pkg
           (cd dist && sha256sum -c SHA256SUMS.txt)
+      - name: Diagnose GitHub token permissions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          echo "Event: ${GITHUB_EVENT_NAME}"
+          echo "Actor: ${GITHUB_ACTOR}"
+          echo "Repository: ${GITHUB_REPOSITORY}"
+          echo "Workflow permission request: actions=read, contents=write"
+          echo "Checking token's repository permissions (never printing the token)..."
+          headers="$(mktemp)"
+          gh api -i "repos/${GITHUB_REPOSITORY}" > "$headers"
+          grep -i '^x-oauth-scopes:\|^x-accepted-oauth-scopes:\|^x-github-request-id:' "$headers" || true
+          rm -f "$headers"
+          echo "Checking whether token can read repository release metadata..."
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --jq 'length'
+          echo "Checking repository-level Actions permissions (may require admin rights)..."
+          gh api "repos/${GITHUB_REPOSITORY}/actions/permissions/workflow" --jq '{default_workflow_permissions,can_approve_pull_request_reviews}' || true
       - name: Publish v1.63 stable release from Build 2
         env:
           GH_TOKEN: ${{ github.token }}
