@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     container:
-      image: ghcr.io/ps3dev/ps3dev:latest
+      image: hldtux/ps3dev:latest
     env:
       PS3DEV: /usr/local/ps3dev
       PSL1GHT: /usr/local/ps3dev/psl1ght
@@ -30,9 +30,9 @@ jobs:
         run: |
           set -eu
           for d in /usr/local/ps3dev /opt/ps3dev; do
-            if [ -f "$d/psl1ght/ppu_rules" ]; then
+            if [ -f "$d/psl1ght/ppu_rules" ] || [ -f "$d/ppu_rules" ]; then
               echo "PS3DEV=$d" >> "$GITHUB_ENV"
-              echo "PSL1GHT=$d/psl1ght" >> "$GITHUB_ENV"
+              if [ -f "$d/psl1ght/ppu_rules" ]; then echo "PSL1GHT=$d/psl1ght" >> "$GITHUB_ENV"; else echo "PSL1GHT=$d" >> "$GITHUB_ENV"; fi
               echo "$d/bin" >> "$GITHUB_PATH"
               echo "$d/ppu/bin" >> "$GITHUB_PATH"
               exit 0
