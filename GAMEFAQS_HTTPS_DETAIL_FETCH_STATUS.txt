@@ -1,0 +1,26 @@
+Stage66 GameFAQs HTTPS Detail Fetch Checkpoint
+
+Integrated in source/main.cpp:
+- At Saves > game > region > individual save, press Square to GET the
+  indexed GameFAQs individual-save page over HTTPS.
+- Reuses existing curl networking, certificate configuration and
+  bounded catalogue response writer.
+- No redirect following; HTTP 200 required; 384 KiB response limit.
+- Parses explicitly linked, same-host save files only.
+- Appends newly found download URLs to GAMEFAQS_SAVES.tsv; reloads index.
+- Cross on verified direct link uses the existing file downloader.
+- Cross on page-only entry remains non-downloading.
+- Square on other Saves levels reloads the local TSV.
+- Original saves are never converted automatically.
+
+LIMITATIONS:
+- This does not crawl all GameFAQs listings or auto-populate games.
+- GameFAQs may block PS3 clients or serve dynamic download URLs.
+- Only same-host explicit extension links are accepted; redirected CDN
+  or token-based downloads are intentionally not assumed supported.
+- The network path has NOT been tested against real GameFAQs responses.
+- No PS3 build, ELF, SELF, PKG, or hardware validation performed.
+- The operation is synchronous; the UI may pause for up to 25 seconds.
+- Future work: nonblocking worker, cancellation, real site validation,
+  catalogue discovery, and atomic index updates.
+Host parser tests: PASS (gcc -Wall -Wextra -Werror).

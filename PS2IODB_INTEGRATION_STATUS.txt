@@ -1,0 +1,19 @@
+PS2IODB cache integration checkpoint — 19 October 2026
+
+ADDED:
+- source/ps2iodb_cache.c and include/ps2iodb_cache.h
+- Exact versus cross-region lookup for NBA Street and Street Fighter EX3.
+- Callable HTTPS fetch routine with CA verification, bounded file sizes,
+  atomic .part rename and isolated cache root supplied by the caller.
+- OBJ, MTL, PNG, iconsys.json and optional animation fetch.
+- Host unit test.
+
+NOT YET CONNECTED TO THE CONTROLLER/UI:
+- No automatic download trigger or status/progress UI.
+- No native ICN reconstruction or animation restoration.
+- No PSU modifications. Opening XPO remains read-only.
+- Not compiled into a PS3 binary or verified on console.
+
+Integration call site should initialize networking, resolve the existing CA
+bundle, and pass a dedicated cache directory outside fakeusb/PS2/SAVEDATA.
+Cross-region candidates require explicit user approval before PSU export.

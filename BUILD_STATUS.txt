@@ -1,0 +1,1 @@
+PS3DEV PSL1GHT: ELF, CEX SELF and PKG compiled successfully. GameFAQs parser host tests passed. Full host-test suite blocked by missing host mbedtls/gcm.h. No hardware or RPCS3 runtime test. Live GameFAQs retrieval remains unverified.

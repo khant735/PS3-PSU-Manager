@@ -1,0 +1,1 @@
+Native C HTML link extractor for previously fetched individual GameFAQs save pages. Host GCC tests pass. Not yet wired to live PS3 HTTPS downloader or menu. Only explicit same-host links with save extensions are accepted; not proof that URLs are downloadable. No live GameFAQs access verified, no PS3 binary compiled.

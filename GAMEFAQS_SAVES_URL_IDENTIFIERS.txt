@@ -1,0 +1,7 @@
+Verified URL structure from user-provided examples:
+Game listing: https://gamefaqs.gamespot.com/ps2/561292-silent-hill-3/saves
+Individual save page: https://gamefaqs.gamespot.com/ps2/561292-silent-hill-3/saves/30435
+Game ID: 561292; Save ID: 30435.
+These are identifiers only. No download URL, save format, region or file content has been verified.
+The C parser exposes gfs_parse_save_page_ids() and tests both URL forms.
+Live indexing and downloader integration remain incomplete.

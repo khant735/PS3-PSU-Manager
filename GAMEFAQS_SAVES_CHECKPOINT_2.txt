@@ -1,0 +1,13 @@
+Stage66 GameFAQs Saves browser checkpoint 2 (2026-10-19)
+
+Changes:
+- Only show alphabetical buckets containing at least one indexed game.
+- Replace repeated saves_row() calls with direct count traversal.
+- Square reloads GAMEFAQS_SAVES.tsv from disk without restarting.
+- Existing hierarchy and original-file download behaviour retained.
+- Host C parser test: PASS.
+
+Important: This is NOT a GameFAQs scraper, live feed, or complete catalogue.
+No authorized bulk index endpoint or reliable direct-file mechanism is verified.
+The browser still requires GAMEFAQS_SAVES.tsv in USRDIR.
+No PS3 binary build or runtime test performed.

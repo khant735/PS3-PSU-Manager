@@ -1,0 +1,18 @@
+Stage66 GameFAQs Saves browser integration checkpoint
+
+Added a third catalogue selection in Options: GAMEFAQS SAVES.
+The existing PS2Wiki and PS2 Homebrew Store choices remain.
+GameFAQs Saves offers 0-9/A-Z -> Game -> Region -> Save format and description.
+Reads GAMEFAQS_SAVES.tsv from /dev_hdd0/game/PSU000001/USRDIR/.
+The TSV parser validates page URLs and accepts only approved direct file links.
+The existing downloader is invoked only when a verified direct link is present.
+Opening a listing is read-only. Downloads are explicit and do not convert saves.
+
+IMPORTANT: No official or authorized bulk GameFAQs save-index feed has been
+verified. No real save entries are bundled or fabricated. The menu will show
+an empty index until populated with valid records. This is not a functional
+GameFAQs crawler or full save catalogue.
+
+Host test: gcc -std=c11 -Wall -Wextra -Werror -Isource source/gamefaqs_saves_index.c tests/test_gamefaqs_saves.c -o test_gfs && ./test_gfs
+
+Not yet PS3 compiled or tested; no ELF/SELF/PKG included.

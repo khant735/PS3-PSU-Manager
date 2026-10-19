@@ -1,0 +1,4 @@
+GameFAQs Saves catalogue source checkpoint.
+
+Fix: empty catalogue no longer presents 27 selectable alphabet entries.
+Host parser tests pass. Live GameFAQs crawling, indexing and downloading are not implemented or validated. The app only reads an existing GAMEFAQS_SAVES.tsv. No game entries or direct download links are fabricated. No new PS3 binaries have been built.

@@ -1,0 +1,6 @@
+Adds parsing of actual individual GameFAQs /saves/<save-id> pages in locally saved HTML.
+Separates individual save-page links from explicit file download links.
+No live site scraping, no invented download URLs, no PS3-native integration yet.
+Usage: python tools/gamefaqs_html_import/gamefaqs_detail_import.py saved.html --page-url https://gamefaqs.gamespot.com/ps2/561292-silent-hill-3/saves/30435 --game "Silent Hill 3" --region Europe
+Tests: cd tools/gamefaqs_html_import && python -m unittest test_gamefaqs_detail_import.py
+Tests passed 3/3. Only verified same-host direct links with save extensions become downloadable TSV rows.

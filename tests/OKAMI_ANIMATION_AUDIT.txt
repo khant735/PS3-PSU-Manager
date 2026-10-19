@@ -1,0 +1,15 @@
+Okami PS2 icon animation audit — 18 October 2026
+
+Source: four user-provided Okami SPS/XPS archives and Stage 64 source.
+Reference: user-provided b3pkyd.gif (visual reference only).
+
+All four archives embed the same two icon model payloads.
+Both models: header magic 00010000, texture flags 00000007, 507 vertices, 4 morph shapes, 4 animation tracks, uncompressed 128x128x16-bit texture.
+Model A: 26-unit animation duration; morph track key counts 2,3,5,4.
+Model B: 13-unit animation duration; morph track key counts 2,3,5,4.
+Both textures have identical SHA-256 prefix ec4c76498a4e.
+The models differ in geometry and animation timeline.
+
+Stage 64 already parses these layouts, and interpolates their morph tracks. However it uses a fixed 16 animation timeline units/second, a frame-counter-based clock assuming 60 fps, and a continuously rotating model. The original PS2 OSD animation timing and orientation have not been verified. A GIF alone does not establish those timing constants.
+
+Recommendation: compare the live Stage 64 Okami model to the supplied GIF before changing the playback rate or camera rotation. Preserve Stage 64 ICO animation, V1 icon thumbnails, placeholders and keyboards.
