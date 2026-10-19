@@ -1,0 +1,81 @@
+name: PS3 PSU Manager — Build and Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Create or update a GitHub Release after a successful build'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      image: ghcr.io/ps3dev/ps3dev:latest
+    env:
+      PS3DEV: /usr/local/ps3dev
+      PSL1GHT: /usr/local/ps3dev/psl1ght
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+      - name: Locate PS3 toolchain
+        run: |
+          set -eu
+          for d in /usr/local/ps3dev /opt/ps3dev; do
+            if [ -f "$d/psl1ght/ppu_rules" ]; then
+              echo "PS3DEV=$d" >> "$GITHUB_ENV"
+              echo "PSL1GHT=$d/psl1ght" >> "$GITHUB_ENV"
+              echo "$d/bin" >> "$GITHUB_PATH"
+              echo "$d/ppu/bin" >> "$GITHUB_PATH"
+              exit 0
+            fi
+          done
+          echo 'ERROR: PSL1GHT ppu_rules missing from builder image' >&2
+          exit 1
+      - name: Compile ELF and generate SELF / PKG
+        run: |
+          set -eux
+          make -j2
+          make pkg
+          test -s ps3psumanager.elf
+          test -s ps3psumanager.self
+          test -s ps3psumanager.pkg
+      - name: Stage binaries and SHA-256 checksums
+        run: |
+          set -eu
+          mkdir -p dist
+          cp ps3psumanager.elf dist/PS3-PSU-Manager-v1.63.elf
+          cp ps3psumanager.self dist/PS3-PSU-Manager-v1.63.self
+          cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63.pkg
+          cd dist
+          sha256sum *.elf *.self *.pkg > SHA256SUMS.txt
+      - name: Upload Actions build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS3-PSU-Manager-v1.63-ELF-SELF-PKG
+          path: dist/*
+          if-no-files-found: error
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.publish_release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+            TAG="$GITHUB_REF_NAME"
+          else
+            TAG="v1.63-stage66"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --title "PS3 PSU Manager $TAG" --notes "Automated PS3DEV/PSL1GHT build: unencrypted ELF, CFW-compatible SELF and installable PKG. Development build; test on hardware with backups." --prerelease --target "$GITHUB_SHA"
+          fi
