@@ -47,10 +47,14 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/actions/permissions/workflow" --jq '{default_workflow_permissions,can_approve_pull_request_reviews}' || true
       - name: Publish v1.63 stable release from Build 2
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo 'RELEASE_TOKEN is missing. Add it under Settings > Secrets and variables > Actions.' >&2
+            exit 1
+          fi
           TAG=v1.63
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release edit "$TAG" --prerelease=false --latest
