@@ -14,11 +14,10 @@ jobs:
   publish:
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository for GitHub CLI
-        uses: actions/checkout@v4
       - name: Retrieve verified Build 2 artifact
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -eu
           gh api -H "Accept: application/vnd.github+json" "/repos/${GITHUB_REPOSITORY}/actions/artifacts/12170273058/zip" > build2.zip
@@ -30,6 +29,7 @@ jobs:
       - name: Publish v1.63 stable release from Build 2
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           set -eu
           TAG=v1.63
