@@ -45,6 +45,28 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/releases" --jq 'length'
           echo "Checking repository-level Actions permissions (may require admin rights)..."
           gh api "repos/${GITHUB_REPOSITORY}/actions/permissions/workflow" --jq '{default_workflow_permissions,can_approve_pull_request_reviews}' || true
+      - name: Diagnose release token identity and access
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          if [ -z "${GH_TOKEN:-}" ]; then
+            echo "::error::RELEASE_TOKEN secret is missing"
+            exit 1
+          fi
+          echo "Checking RELEASE_TOKEN identity (token value is never printed)..."
+          gh api user --jq '{login, type}'
+          echo "Checking repository visibility and authenticated permission flags..."
+          gh api "repos/${GITHUB_REPOSITORY}" --jq '{full_name, private, archived, disabled, permissions}'
+          echo "Checking release-read access..."
+          gh api "repos/${GITHUB_REPOSITORY}/releases" --jq 'length'
+          echo "Checking API permission headers for release endpoint..."
+          tmp="$(mktemp)"
+          gh api -i "repos/${GITHUB_REPOSITORY}/releases" > "$tmp"
+          grep -i -E '^x-accepted-github-permissions:|^x-oauth-scopes:|^x-github-request-id:' "$tmp" || true
+          rm -f "$tmp"
+          echo "Release token diagnostics completed; no release mutation attempted in this step."
       - name: Publish v1.63 stable release from Build 2
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
