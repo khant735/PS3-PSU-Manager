@@ -1,6 +1,7 @@
 name: Publish successful Build 2 as stable release
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - '.github/workflows/publish-build-2.yml'
