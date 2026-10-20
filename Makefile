@@ -8,7 +8,7 @@ TARGET := ps3psumanager
 BUILD := build
 SOURCES := source
 INCLUDES := include
-TITLE := PS2 .psu Save Manager v1.63
+TITLE := PS2 .psu Save Manager v1.63T
 APPID := PSU000001
 CONTENTID := UP0001-$(APPID)_00-0000000000000000
 ICON0 := $(CURDIR)/assets/ICON0.PNG
@@ -41,7 +41,7 @@ clean:
 pkg: $(BUILD)
 	@$(MAKE) --no-print-directory -W $(OUTPUT).self $(OUTPUT).pkg
 	@test -f $(BUILDDIR)/pkg/PARAM.HIP || (echo "ERROR: PARAM.HIP missing from package staging"; exit 1)
-	@grep -q "PS2 .PSU SAVE MANAGER v1.63" $(BUILDDIR)/pkg/PARAM.HIP || (echo "ERROR: PARAM.HIP version text mismatch"; exit 1)
+	@grep -q "PS2 .PSU SAVE MANAGER v1.63T" $(BUILDDIR)/pkg/PARAM.HIP || (echo "ERROR: PARAM.HIP version text mismatch"; exit 1)
 	@test -s $(BUILDDIR)/pkg/USRDIR/cacert.pem || (echo "ERROR: CA bundle missing from package staging"; exit 1)
 run: $(BUILD)
 	ps3load $(OUTPUT).self
