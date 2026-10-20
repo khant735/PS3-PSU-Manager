@@ -9,6 +9,8 @@ extern "C" {
 int gfs_extract_detail_html(const char *html, const char *page_url,
                             const char *game, const char *region,
                             gfs_save_t *out, int capacity);
+/* Extract and deduplicate verified save-page URLs from catalogue HTML. */
+int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity);
 #ifdef __cplusplus
 }
 #endif
