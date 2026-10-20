@@ -20,10 +20,6 @@ Official numbered releases use tags such as `v1.63` and `v1.64`. These are separ
 
 Each development build has a unique `dev-v1.63-build.RUN.ATTEMPT` tag and its own ELF, SELF, PKG and SHA-256 files. The index is automatically regenerated from GitHub releases after each successful build, without using GitHub's unreliable release search filter.
 
-**[View all GitHub releases](https://github.com/khant735/PS3-PSU-Manager/releases)** · **[View build workflows](https://github.com/khant735/PS3-PSU-Manager/actions)**
-
-Back up saves before testing development builds.
-
 ## Intended purpose
 
 Manage PS2 save data on a PS3 without needing a PC for routine browsing, extraction, archive creation and supported downloads. Preserve the original file format, name and region on download.
