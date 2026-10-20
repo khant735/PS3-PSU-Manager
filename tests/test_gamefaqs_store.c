@@ -19,6 +19,13 @@ int main(int argc,char **argv){
  FILE *f=fopen(path,"rb");assert(f);
  char data[4096];size_t n=fread(data,1,sizeof(data)-1,f);fclose(f);data[n]=0;
  gfs_save_t rows[8];assert(gfs_parse_index(data,rows,8)==2);
+ /* A malformed existing row must not be silently dropped on merge. */
+ f=fopen(path,"wb");assert(f);
+ assert(fputs("malformed\\trow\\n",f)>=0);assert(fclose(f)==0);
+ assert(gfs_merge_index_file(path,&e,1,8)==-1);
+ f=fopen(path,"rb");assert(f);
+ n=fread(data,1,sizeof(data)-1,f);fclose(f);data[n]=0;
+ assert(strcmp(data,"malformed\\trow\\n")==0);
  remove(path);
  puts("Persistent GameFAQs index merge OK");
  return 0;
