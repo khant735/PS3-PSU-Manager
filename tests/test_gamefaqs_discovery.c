@@ -25,6 +25,13 @@ int main(void){
  assert(entries[0].download_url[0]==0);
  assert(strstr(entries[0].page_url,"/saves/987654")!=NULL);
  assert(gfs_index_save_pages(pages,"bad\\tgame","USA",entries,4)==-1);
+ unsigned gid=0,sid=0;
+ assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456",&gid,&sid));
+ assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-",&gid,&sid));
+ assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-example/saveswrong",&gid,&sid));
+ assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-example/saves/",&gid,&sid));
+ assert(gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-example/saves/987",&gid,&sid));
+ assert(gid==123456&&sid==987);
  puts("GameFAQs save link discovery OK");
  return 0;
 }
