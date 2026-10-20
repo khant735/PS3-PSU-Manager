@@ -5663,12 +5663,15 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
      }
     }else if(g_saves_scan_running)snprintf(status_line,sizeof(status_line),"GameFAQs: scan already running");
    }else if(g_saves_level==3){
+    if(g_saves_scan_running){snprintf(status_line,sizeof(status_line),"GameFAQs: wait for listing scan to finish");}
+    else {
     char row_label[256];int id=saves_row(g_saves_selected,row_label,sizeof(row_label));
     if(id>=0){
      int n=saves_fetch_detail_page(g_saves_entries[id].page_url,g_saves_entries[id].game,g_saves_entries[id].region);
      if(n>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs index updated: %d total entries",n);}
      else if(n==0)snprintf(status_line,sizeof(status_line),"GameFAQs: no explicit direct file links found");
      else snprintf(status_line,sizeof(status_line),"GameFAQs: detail retrieval failed (%d)",n);
+    }
     }
    }else{
     saves_load_index();g_saves_level=0;g_saves_selected=g_saves_top=0;
