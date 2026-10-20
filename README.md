@@ -75,8 +75,7 @@ Place verified screenshots in `docs/screenshots/` and link them here once captur
 - Live GameFAQs access and file URLs are not verified; the site may use restricted or dynamic downloads.
 - GameFAQs listing discovery runs in a background worker; individual save-detail refresh remains synchronous and may temporarily delay the interface.
 - Save formats other than PSU have varying levels of support.
-- Latest Stage66 integration is not yet hardware-validated.
 
 ## Source and licensing
 
-This repository is intended to contain the current Stage66 source, build files, tests and permitted assets. Review third-party asset licenses before redistribution. Keep generated ELF/SELF/PKG files in GitHub Releases rather than source control.
+This repository is intended to contain the current source, build files, tests and permitted assets. Review third-party asset licenses before redistribution. Keep generated ELF/SELF/PKG files in GitHub Releases rather than source control.
