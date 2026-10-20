@@ -27,7 +27,7 @@ GameTDB is intentionally excluded as a PS2 catalogue source.
 | CodeJunkies / Datel Powersaves and Community Saves | historical completion and cheat-enhanced saves | research only; no verified live feed |
 | CodeBreaker, GameShark, Xploder | historical save archives, not just cheat codes | research only |
 | PS2-Home forum | https://www.ps2-home.com/forum/index.php | save/homebrew forum threads and attachments | access restricted: HTTP 403 observed 2026-10-20; do not claim links verified |\n| Internet Archive Wayback | https://web.archive.org/ | recover historical catalogue and attachment URLs | research only; verify attachment bytes separately |
-| GameHacking.org | https://gamehacking.org/ | cheat codes and identifiers, NOT presumed downloadable saves | separate cheat-data candidate |
+
 
 Swap Magic is not treated as a verified save-download catalogue.
 
@@ -35,7 +35,7 @@ Swap Magic is not treated as a verified save-download catalogue.
 - Keep a canonical game identity separate from release/edition/disc rows. A shared title alone is not sufficient to merge two games.
 - Key release records by verified serial plus edition/revision/disc evidence; do not collapse distinct discs or regional releases.
 - Never invent dates, countries, editions, formats, URLs, or download availability. Preserve source URL, observed date and date precision.
-- Save entries must retain original format, source URL, author if known, region and descriptive progress/cheat state. Conversion to PSU must be separately validated.
+- Save entries must retain original format, source URL, author if known, region and descriptive progress state. Completed or modified save files are eligible, but cheat-code lists and code-only downloads are out of scope. Conversion to PSU must be separately validated.
 - An HTTP challenge, CAPTCHA, Cloudflare page, redirect loop or rate limit is a source failure, never an empty catalogue.
 - Respect site access rules and rate limits. Prefer official structured feeds. Do not bypass access controls.
 - On parse/download/write failure preserve existing database files; stage new files before atomic replacement.
@@ -61,3 +61,6 @@ A provider is **complete** only when discovery, parsing, bounded fetching, retry
 6. Evaluate PS2 Save Tools and historical CodeJunkies/CodeBreaker/GameShark/Xploder archives; classify Wayback and PS2-Home failures accurately.
 7. Integrate search, regional filtering, format conversion, validation and safe downloading in the PS3 UI.
 8. Compile ELF/SELF/PKG, run fixture tests and hardware/emulator checks, publish only verified outputs.
+
+## Explicit exclusion: cheat codes
+PS3 PSU Manager is a PS2 save-file manager, not a cheat-code database. Do not crawl or import GameHacking.org code lists, Action Replay/CodeBreaker/GameShark code strings, patch databases, or Artemis cheats. Historical cheat-device websites are candidates only for actual downloadable PS2 memory-card save files (for example MAX, CBS, XPS, PSU or PSV), including saves with unlocked content or completed progress.
