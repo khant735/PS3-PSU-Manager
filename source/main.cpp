@@ -1,3 +1,5 @@
+#include "gamefaqs_curl_transport.h"
+#include "gamefaqs_discovery_pipeline.h"
 #include "ps2_game_titles.h"
 #include "ps2_game_db_update.h"
 #include <fcntl.h>
@@ -4936,36 +4938,11 @@ static int saves_fetch_detail_page(const char *page_url,const char *game,const c
  unsigned gid=0,sid=0;
  if(!gfs_parse_save_page_ids(page_url,&gid,&sid)||!sid)return -1;
  if(downloader_net_init()!=0)return -2;
- const size_t limit=384*1024;
- char *html=(char*)malloc(limit+1);if(!html)return -3;
- catalogue_http_buffer_t data={html,0,limit,0};
- CURL *c=curl_easy_init();if(!c){free(html);return -4;}
- curl_easy_setopt(c,CURLOPT_URL,page_url);
- curl_easy_setopt(c,CURLOPT_WRITEFUNCTION,catalogue_http_write);
- curl_easy_setopt(c,CURLOPT_WRITEDATA,&data);
- curl_easy_setopt(c,CURLOPT_USERAGENT,"PS3-PSU-Manager/1.63T (GameFAQs Saves)");
- curl_easy_setopt(c,CURLOPT_FOLLOWLOCATION,0L);
- curl_easy_setopt(c,CURLOPT_CONNECTTIMEOUT,10L);
- curl_easy_setopt(c,CURLOPT_TIMEOUT,25L);
- curl_easy_setopt(c,CURLOPT_FAILONERROR,1L);
- if(!downloader_apply_store_tls(c)){curl_easy_cleanup(c);free(html);return -5;}
- CURLcode rc=curl_easy_perform(c);long status=0;
- curl_easy_getinfo(c,CURLINFO_RESPONSE_CODE,&status);curl_easy_cleanup(c);
- if(rc!=CURLE_OK||status!=200||data.overflow){free(html);return -6;}
- html[data.used]=0;
- gfs_save_t found[24];int n=gfs_extract_detail_html(html,page_url,game,region,found,24);
- free(html);if(n<=0)return n==0?0:-7;
- FILE *f=fopen(g_saves_index_path,"ab");if(!f)return -8;
- int added=0;
- for(int i=0;i<n;i++){
-  int dup=0;for(int j=0;j<g_saves_count;j++)
-   if(!strcmp(found[i].download_url,g_saves_entries[j].download_url)){dup=1;break;}
-  if(dup)continue;
-  if(fprintf(f,"%s\t%s\t%s\t%s\t%s\t%s\n",found[i].game,found[i].region,
-   found[i].format,found[i].description,found[i].page_url,found[i].download_url)>0)added++;
- }
- if(fclose(f)!=0)return -9;
- return added;
+ char *html=NULL;size_t length=0;
+ if(gfs_curl_fetch(page_url,&html,&length,NULL)!=200)return -3;
+ int merged=gfs_ingest_html(g_saves_index_path,html,page_url,game,region,GFS_MAX_ENTRIES);
+ gfs_curl_release(html,NULL);
+ return merged<0?-4:merged;
 }
 
 static void saves_load_index(){
