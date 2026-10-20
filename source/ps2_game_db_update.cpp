@@ -60,6 +60,18 @@ static bool parse_titles(const std::string &s,std::map<std::string,std::string> 
  if(s[p]==','){p++;continue;}if(s[p]=='}'){p++;ws(s,p);return p==s.size();}return false;
  }return false;
 }
+/* Redump serials may use underscores or omit the dash; normalize only
+   known four-letter/five-digit PS2 serial shapes. */
+static std::string redump_serial_at(const std::string &name,size_t pos){
+ if(pos+10>name.size())return std::string();
+ std::string id=name.substr(pos,10);
+ if(id[4]=='_')id[4]='-';
+ for(size_t j=0;j<4;j++)id[j]=(char)toupper((unsigned char)id[j]);
+ if(!serial(id))return std::string();
+ if(pos>0&&isalnum((unsigned char)name[pos-1]))return std::string();
+ if(pos+10<name.size()&&isalnum((unsigned char)name[pos+10]))return std::string();
+ return id;
+}
 static void merge_redump_xml(const std::string &s,std::map<std::string,std::string> &titles,std::map<std::string,std::string> &sources){
  // Redump names may contain serial in parentheses; keep existing GameDB names authoritative.
  size_t pos=0;while((pos=s.find("<game ",pos))!=std::string::npos){
@@ -68,7 +80,7 @@ static void merge_redump_xml(const std::string &s,std::map<std::string,std::stri
  attr+=6;size_t q=s.find('"',attr);if(q==std::string::npos||q>end){pos=end+1;continue;}
  std::string name=s.substr(attr,q-attr);pos=end+1;
  for(size_t i=0;i+10<=name.size();i++){
- std::string id=name.substr(i,10);if(serial(id)&&titles.find(id)==titles.end()){
+ std::string id=redump_serial_at(name,i);if(!id.empty()&&titles.find(id)==titles.end()){
  titles[id]=name;sources[id]="Redump";break;
  }
  }
