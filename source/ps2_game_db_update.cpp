@@ -49,7 +49,7 @@ static bool quoted(const std::string &s,size_t &p,std::string &v){
 static bool parse_titles(const std::string &s,std::map<std::string,std::string> &titles){
  size_t p=0;ws(s,p);if(p>=s.size()||s[p++]!='{')return false;
  while(p<s.size()){
- ws(s,p);if(s[p]=='}'){p++;ws(s,p);return p==s.size();}
+ ws(s,p);if(p>=s.size())return false;if(s[p]=='}'){p++;ws(s,p);return p==s.size();}
  std::string key,val;if(!quoted(s,p,key))return false;ws(s,p);
  if(p>=s.size()||s[p++]!=':')return false;ws(s,p);
  if(p>=s.size()||s[p]!='"')return false; // reject unknown schema, never corrupt existing DB
@@ -57,7 +57,7 @@ static bool parse_titles(const std::string &s,std::map<std::string,std::string> 
  for(size_t i=0;i<key.size();i++)key[i]=(char)toupper((unsigned char)key[i]);
  if(serial(key)&&!val.empty()&&val.size()<512)titles[key]=val;
  ws(s,p);if(p>=s.size())return false;
- if(s[p]==','){p++;continue;}if(s[p]=='}'){p++;ws(s,p);return p==s.size();}return false;
+ if(s[p]==','){p++;ws(s,p);if(p>=s.size()||s[p]=='}')return false;continue;}if(s[p]=='}'){p++;ws(s,p);return p==s.size();}return false;
  }return false;
 }
 /* Redump serials may use underscores or omit the dash; normalize only
