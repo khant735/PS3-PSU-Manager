@@ -73,11 +73,13 @@ int gfs_parse_save_page_ids(const char *url, unsigned *game_id, unsigned *save_i
   if(game>100000000U)return 0;
   game=game*10+digit;
  }
- if(*p++!='-')return 0;
+ if(*p!='-')return 0;
+ p++;
  const char *slug=p;
  while(isalnum((unsigned char)*p)||*p=='-')p++;
  if(p==slug||strncmp(p,"/saves",6))return 0;
  p+=6;
+ if(*p&&*p!='/'&&*p!='?'&&*p!='#')return 0;
  if(*p=='/'){
   p++;
   if(!isdigit((unsigned char)*p))return 0;
