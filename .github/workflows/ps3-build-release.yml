@@ -23,8 +23,14 @@ jobs:
       PS3DEV: /usr/local/ps3dev
       PSL1GHT: /usr/local/ps3dev/psl1ght
     steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+      - name: Checkout exact source commit without third-party actions
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          test -f Makefile
       - name: Locate PS3 toolchain
         run: |
           set -eu
@@ -56,12 +62,6 @@ jobs:
           cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63.pkg
           cd dist
           sha256sum *.elf *.self *.pkg > SHA256SUMS.txt
-      - name: Upload Actions build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: PS3-PSU-Manager-v1.63-ELF-SELF-PKG
-          path: dist/*
-          if-no-files-found: error
       - name: Publish individual files to GitHub Release
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:
