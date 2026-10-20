@@ -50,3 +50,38 @@ int gfs_extract_detail_html(const char *html,const char *page_url,
  }
  return count;
 }
+
+
+/* Discover explicit PS2 save-list and save-detail links from catalogue HTML.
+ * Only gamefaqs.gamespot.com links are accepted; no guessed endpoints.
+ * Output is capacity records of 384 bytes each, NUL terminated. */
+int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity){
+ if(!html||!urls||capacity<=0)return -1;
+ int count=0;const char *p=html;
+ while((p=strstr(p,"href"))!=NULL){
+  const char *a=p+4;while(*a==' '||*a=='\t')a++;
+  if(*a!='='){p+=4;continue;}a++;
+  while(*a==' '||*a=='\t')a++;
+  char quote=*a;if(quote!='\''&&quote!='"'){p+=4;continue;}a++;
+  const char *end=strchr(a,quote);if(!end)break;
+  size_t n=(size_t)(end-a);p=end+1;
+  if(!n||n>=384)continue;
+  char url[384];memcpy(url,a,n);url[n]=0;
+  if(prefix(url,"/ps2/")){
+   char full[384];const char *host="https://gamefaqs.gamespot.com";
+   if(strlen(host)+n>=sizeof(full))continue;
+   snprintf(full,sizeof(full),"%s%s",host,url);
+   copy(url,sizeof(url),full);
+  }
+  unsigned game_id=0,save_id=0;
+  if(!gfs_parse_save_page_ids(url,&game_id,&save_id))continue;
+  /* Drop fragment/query parameters for a stable deduplication key. */
+  char *tail=strpbrk(url,"?#");if(tail)*tail=0;
+  int duplicate=0;
+  for(int i=0;i<count;i++)if(!strcmp(urls[i],url)){duplicate=1;break;}
+  if(duplicate)continue;
+  if(count>=capacity)break;
+  copy(urls[count++],384,url);
+ }
+ return count;
+}
