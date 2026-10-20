@@ -4935,6 +4935,20 @@ static void homebrew_catalogue_download_selected(){int ai=g_homebrew_asset_selec
 
 
 /* User-triggered, bounded HTTPS detail-page retrieval. Never guess links. */
+static int saves_refresh_game_listing(const gfs_save_t *entry);
+/* Save discovery runs off the render/controller thread. The UI reads the
+ * completed result only after the worker has published its completion flag. */
+static volatile int g_saves_scan_running=0,g_saves_scan_finished=0;
+static volatile int g_saves_scan_result=0;
+static gfs_save_t g_saves_scan_entry;
+static void saves_listing_worker(void *unused){
+ (void)unused;
+ int result=saves_refresh_game_listing(&g_saves_scan_entry);
+ g_saves_scan_result=result;
+ __sync_synchronize();
+ g_saves_scan_finished=1;
+ sysThreadExit(0);
+}
 static int saves_refresh_game_listing(const gfs_save_t *entry){
  if(!entry)return -1;
  unsigned gid=0,sid=0;
@@ -5626,13 +5640,28 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
   draw();continue;
  }
  if(g_saves_active){
+  if(g_saves_scan_running&&g_saves_scan_finished){
+   __sync_synchronize();
+   int result=g_saves_scan_result;
+   g_saves_scan_running=0;g_saves_scan_finished=0;
+   if(result>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs: %d pages processed",result);}
+   else snprintf(status_line,sizeof(status_line),"GameFAQs: listing scan failed (%d)",result);
+   g_ui_dirty=1;
+  }
   if(press&B_SQUARE){
    if(g_saves_level==2){
     char row_label[256];int id=saves_row(g_saves_selected,row_label,sizeof(row_label));
-    if(id>=0){int n=saves_refresh_game_listing(&g_saves_entries[id]);
-     if(n>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs: %d pages processed",n);}
-     else snprintf(status_line,sizeof(status_line),"GameFAQs: listing refresh failed (%d)",n);
-    }
+    if(id>=0&&!g_saves_scan_running){
+     if(downloader_net_init()!=0)snprintf(status_line,sizeof(status_line),"GameFAQs: network initialization failed");
+     else {
+      g_saves_scan_entry=g_saves_entries[id];
+      g_saves_scan_finished=0;g_saves_scan_running=1;
+      sys_ppu_thread_t thread;
+      if(sysThreadCreate(&thread,saves_listing_worker,NULL,1500,0x10000,0,(char*)"gfs_scan")!=0){
+       g_saves_scan_running=0;snprintf(status_line,sizeof(status_line),"GameFAQs: unable to start scan");
+      }else snprintf(status_line,sizeof(status_line),"GameFAQs: scanning save pages...");
+     }
+    }else if(g_saves_scan_running)snprintf(status_line,sizeof(status_line),"GameFAQs: scan already running");
    }else if(g_saves_level==3){
     char row_label[256];int id=saves_row(g_saves_selected,row_label,sizeof(row_label));
     if(id>=0){
