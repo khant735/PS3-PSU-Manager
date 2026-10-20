@@ -63,6 +63,15 @@ jobs:
           cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63.pkg
           cd dist
           sha256sum *.elf *.self *.pkg > SHA256SUMS.txt
+      - name: Install GitHub CLI in PS3DEV container
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        run: |
+          set -eu
+          if ! command -v gh >/dev/null 2>&1; then
+            apt-get update -qq
+            apt-get install -y -qq gh
+          fi
+          gh --version
       - name: Publish individual files to GitHub Release
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         env:
