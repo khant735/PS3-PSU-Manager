@@ -32,6 +32,10 @@ int main(void){
  assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-example/saves/",&gid,&sid));
  assert(gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-example/saves/987",&gid,&sid));
  assert(gid==123456&&sid==987);
+ const char *valid="Example Game\tUSA\tPAGE\tSave detail\thttps://gamefaqs.gamespot.com/ps2/123456-example/saves/987\t\n";
+ const char *extra="Example Game\tUSA\tPAGE\tSave detail\thttps://gamefaqs.gamespot.com/ps2/123456-example/saves/987\t\tunexpected\n";
+ assert(gfs_parse_index(valid,entries,4)==1);
+ assert(gfs_parse_index(extra,entries,4)==0);
  puts("GameFAQs save link discovery OK");
  return 0;
 }
