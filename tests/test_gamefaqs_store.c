@@ -14,6 +14,8 @@ int main(int argc,char **argv){
  assert(gfs_merge_index_file(path,&e,1,8)==1);
  strcpy(e.page_url,"https://gamefaqs.gamespot.com/ps2/123456-example/saves/988");
  assert(gfs_merge_index_file(path,&e,1,8)==2);
+ strcpy(e.download_url,"https://gamefaqs.gamespot.com/download/example.psu");
+ assert(gfs_merge_index_file(path,&e,1,8)==-1);
  strcpy(e.download_url,"https://evil.example/payload.psu");
  assert(gfs_merge_index_file(path,&e,1,8)==-1);
  FILE *f=fopen(path,"rb");assert(f);
