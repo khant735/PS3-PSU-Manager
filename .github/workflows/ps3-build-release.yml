@@ -26,6 +26,7 @@ jobs:
       - name: Checkout exact source commit without third-party actions
         run: |
           set -eu
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --depth=1 origin "$GITHUB_SHA"
