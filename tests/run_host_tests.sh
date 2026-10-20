@@ -33,3 +33,6 @@ python3 tests/test_zip_archive.py "$test_dir/zip-archive" "$test_dir"
 
 cc -std=c99 -Wall -Wextra -Isource tests/test_gamefaqs_discovery.c source/gamefaqs_html_native.c source/gamefaqs_page_index.c source/gamefaqs_saves_index.c -o "$test_dir/gamefaqs-discovery"
 "$test_dir/gamefaqs-discovery"
+
+cc -std=c99 -Wall -Wextra -Isource tests/test_gamefaqs_store.c source/gamefaqs_index_store.c source/gamefaqs_saves_index.c -o "$test_dir/gamefaqs-store"
+"$test_dir/gamefaqs-store" "$test_dir"
