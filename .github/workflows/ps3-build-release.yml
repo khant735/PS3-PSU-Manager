@@ -2,11 +2,6 @@ name: PS3 PSU Manager — Build and Publish
 
 on:
   workflow_dispatch:
-    inputs:
-      publish_release:
-        description: 'Publish direct ELF, SELF and PKG release assets after a successful build'
-        type: boolean
-        default: true
   push:
     branches: [main]
 
@@ -54,15 +49,18 @@ jobs:
           test -s ps3psumanager.elf
           test -s ps3psumanager.self
           test -s ps3psumanager.pkg
-      - name: Stage binaries and SHA-256 checksums
+      - name: Stage uniquely versioned development binaries and checksums
         run: |
           set -eu
+          # Stable versions retain vMAJOR.MINOR; development versions use a
+          # separate dev-vMAJOR.MINOR-build.RUN.ATTEMPT namespace.
+          DEV_VERSION="dev-v1.63-build.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          echo "DEV_VERSION=$DEV_VERSION" >> "$GITHUB_ENV"
           mkdir -p dist
-          cp ps3psumanager.elf dist/PS3-PSU-Manager-v1.63T.elf
-          cp ps3psumanager.self dist/PS3-PSU-Manager-v1.63T.self
-          cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63T.pkg
-          cd dist
-          sha256sum *.elf *.self *.pkg > SHA256SUMS.txt
+          cp ps3psumanager.elf "dist/PS3-PSU-Manager-${DEV_VERSION}.elf"
+          cp ps3psumanager.self "dist/PS3-PSU-Manager-${DEV_VERSION}.self"
+          cp ps3psumanager.pkg "dist/PS3-PSU-Manager-${DEV_VERSION}.pkg"
+          (cd dist && sha256sum *.elf *.self *.pkg > SHA256SUMS.txt)
       - name: Install GitHub CLI in PS3DEV container
         run: |
           set -eu
@@ -71,17 +69,23 @@ jobs:
             apt-get install -y -qq gh
           fi
           gh --version
-      - name: Publish individual files to GitHub Release
-        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+      - name: Publish unique development prerelease
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          TAG="v1.63T-build-${GITHUB_SHA}"
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --prerelease=true
-            gh release upload "$TAG" dist/PS3-PSU-Manager-v1.63T.elf dist/PS3-PSU-Manager-v1.63T.self dist/PS3-PSU-Manager-v1.63T.pkg dist/SHA256SUMS.txt --clobber
-          else
-            gh release create "$TAG" dist/PS3-PSU-Manager-v1.63T.elf dist/PS3-PSU-Manager-v1.63T.self dist/PS3-PSU-Manager-v1.63T.pkg dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "PS3 PSU Manager v1.63T" --notes "Automated test build for commit ${GITHUB_SHA}. GameFAQs HTTPS save listing and detail discovery included. Runtime testing on PS3/RPCS3 required." --prerelease
+          # Never overwrite existing builds or stable release tags.
+          if gh release view "$DEV_VERSION" >/dev/null 2>&1; then
+            echo "ERROR: prerelease tag already exists: $DEV_VERSION" >&2
+            exit 1
           fi
+          gh release create "$DEV_VERSION" \
+            "dist/PS3-PSU-Manager-${DEV_VERSION}.elf" \
+            "dist/PS3-PSU-Manager-${DEV_VERSION}.self" \
+            "dist/PS3-PSU-Manager-${DEV_VERSION}.pkg" \
+            dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "PS3 PSU Manager $DEV_VERSION" \
+            --notes "Development test build $DEV_VERSION. Source commit: $GITHUB_SHA. Workflow run: $GITHUB_RUN_ID, attempt $GITHUB_RUN_ATTEMPT. Not a stable release; requires RPCS3 and real PS3 testing." \
+            --prerelease
