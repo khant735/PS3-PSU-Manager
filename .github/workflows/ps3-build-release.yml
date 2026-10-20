@@ -89,3 +89,53 @@ jobs:
             --title "PS3 PSU Manager $DEV_VERSION" \
             --notes "Development test build $DEV_VERSION. Source commit: $GITHUB_SHA. Workflow run: $GITHUB_RUN_ID, attempt $GITHUB_RUN_ATTEMPT. Not a stable release; requires RPCS3 and real PS3 testing." \
             --prerelease
+      - name: Refresh development build index from published releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          # Fetch every release page; do not truncate older development builds.
+          gh api --paginate "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > /tmp/psu-releases.json
+          python3 - <<'PY'
+          import json, re
+          from pathlib import Path
+          releases=json.loads(Path('/tmp/psu-releases.json').read_text())
+          rows=[]
+          for rel in releases:
+              tag=rel.get('tag_name','')
+              if not re.fullmatch(r'dev-v[0-9]+(?:\.[0-9]+)*-build\.[0-9]+\.[0-9]+',tag):
+                  continue
+              if not rel.get('prerelease') or rel.get('draft'):
+                  continue
+              assets={a['name'].rsplit('.',1)[-1].lower():a['browser_download_url']
+                      for a in rel.get('assets',[]) if a['name'].endswith(('.elf','.self','.pkg'))}
+              checks=next((a['browser_download_url'] for a in rel.get('assets',[])
+                           if a['name']=='SHA256SUMS.txt'),None)
+              links=[f'[{ext.upper()}]({assets[ext]})' for ext in ('pkg','elf','self') if ext in assets]
+              if checks: links.append(f'[SHA-256]({checks})')
+              stamp=(rel.get('published_at') or rel.get('created_at') or '')[:10]
+              rows.append((tag,stamp,' · '.join(links),rel['html_url']))
+          def sortkey(item):
+              m=re.fullmatch(r'dev-v([0-9.]+)-build\.([0-9]+)\.([0-9]+)',item[0])
+              return (tuple(map(int,m.group(1).split('.'))),int(m.group(2)),int(m.group(3)))
+          rows.sort(key=sortkey,reverse=True)
+          path=Path('docs/DEVELOPMENT_BUILDS.md')
+          doc=path.read_text()
+          start='<!-- DEV_BUILDS_START -->'
+          end='<!-- DEV_BUILDS_END -->'
+          assert doc.count(start)==1 and doc.count(end)==1
+          table='| Development version | Build date (UTC) | Downloads |\n| --- | --- | --- |\n'
+          for tag,stamp,links,url in rows:
+              table+=f'| [{tag}]({url}) | {stamp} | {links} |\n'
+          if not rows: table+='| No published development builds yet | — | — |\n'
+          doc=doc[:doc.index(start)+len(start)]+'\n'+table+doc[doc.index(end):]
+          path.write_text(doc)
+          PY
+          if ! git diff --quiet -- docs/DEVELOPMENT_BUILDS.md; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add docs/DEVELOPMENT_BUILDS.md
+            git commit -m "docs: refresh development build downloads [skip ci]"
+            git push origin "HEAD:main"
+          fi
