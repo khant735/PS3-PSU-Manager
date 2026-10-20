@@ -46,9 +46,24 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
   fclose(f);
  }
  data[bytes]=0;
+ /* Refuse to overwrite a database containing rows the current parser
+  * cannot round-trip. An unknown or malformed row is not an empty save. */
+ int expected=0;
+ if(bytes && memchr(data,0,(size_t)bytes)){
+  free(data);free(entries);free(tmp);return -1;
+ }
+ for(const char *line=data;*line;){
+  const char *end=strchr(line,'\n');
+  if(!end)end=line+strlen(line);
+  const char *p=line;
+  while(p<end&&(*p==' '||*p=='\r'))p++;
+  if(p<end&&*p!='#')expected++;
+  line=*end?end+1:end;
+ }
+ if(expected>maximum_entries){free(data);free(entries);free(tmp);return -1;}
  int count=bytes?gfs_parse_index(data,entries,maximum_entries):0;
  free(data);
- if(count<0){free(entries);free(tmp);return -1;}
+ if(count<0||count!=expected){free(entries);free(tmp);return -1;}
  for(int i=0;i<incoming_count;i++){
   if(!valid(&incoming[i])){free(entries);free(tmp);return -1;}
   int dup=0;
