@@ -5032,7 +5032,7 @@ static void draw_saves_catalogue(){
  }
  int fy=y+header+(visible?visible:1)*rowh+7;
  text_centered_bounded(x+18,fy,w-36,24,g_saves_count?"X OPEN / DOWNLOAD    O BACK":"GameFAQs index missing/empty - separate from Game DB",0xFF9EF2B0u,g_help_scale);
- text_centered_bounded(x+18,fy+25,w-36,24,"Direct file links only; saves are never converted automatically",0xFFBBD1E0u,g_help_scale);
+ text_centered_bounded(x+18,fy+25,w-36,24,g_saves_level==2?"SQUARE SCAN GAME SAVES  |  X OPEN REGION":g_saves_level==3?"SQUARE REFRESH SAVE LINKS  |  X DOWNLOAD":"Direct file links only; saves are never converted automatically",0xFFBBD1E0u,g_help_scale);
 }
 static void draw_homebrew_catalogue(){
  if(!g_homebrew_active)return;
