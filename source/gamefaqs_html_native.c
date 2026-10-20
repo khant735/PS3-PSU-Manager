@@ -73,6 +73,8 @@ int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity){
    snprintf(full,sizeof(full),"%s%s",host,url);
    copy(url,sizeof(url),full);
   }
+  /* Do not misindex HTML entity-encoded links as raw URLs. */
+  if(strchr(url,38))continue;
   unsigned game_id=0,save_id=0;
   if(!gfs_parse_save_page_ids(url,&game_id,&save_id))continue;
   /* Drop fragment/query parameters for a stable deduplication key. */
