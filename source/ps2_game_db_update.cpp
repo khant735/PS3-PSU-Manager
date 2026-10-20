@@ -100,20 +100,42 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
  }
  if(fflush(f)!=0)ok=false;if(fclose(f)!=0)ok=false;
  if(!ok||rename(temp.c_str(),target)!=0){remove(temp.c_str());if(message&&cap)snprintf(message,cap,"Database write failed; previous DB preserved");return -1;}
- /* A separate release index preserves individual serials without inventing region,
-    revision, or date. It is intentionally not deduplicated by display title. */
+ /* Build a per-serial release index locally. Preserve existing enriched records
+    so a routine GameDB refresh cannot erase verified release metadata. */
  std::string releases=std::string(target);
  size_t dot=releases.rfind(".tsv");
  if(dot!=std::string::npos)releases.replace(dot,4,".releases.tsv");
  else releases+=".releases.tsv";
+ std::map<std::string,std::string> previous;
+ FILE *existing=fopen(releases.c_str(),"rb");
+ if(existing){
+  char line[4096];
+  while(fgets(line,sizeof(line),existing)){
+   if(line[0]=='#')continue;
+   char *tab=strchr(line,'\t');
+   if(!tab)continue;
+   std::string id(line,(size_t)(tab-line));
+   if(serial(id)){
+    std::string row(line);
+    if(row.find('\n')==std::string::npos)continue;
+    previous[id]=row;
+   }
+  }
+  fclose(existing);
+ }
  std::string release_tmp=releases+".part";
  FILE *rf=fopen(release_tmp.c_str(),"wb");
  if(rf){
-  bool rok=fputs("# serial\\ttitle\\tregion\\tedition\\trevision\\trelease_date\\tdate_precision\\tsource\\n",rf)>=0;
+  bool rok=fputs("# serial\ttitle\tregion\tedition\trevision\trelease_date\tdate_precision\tsource\n",rf)>=0;
   for(std::map<std::string,std::string>::const_iterator it=titles.begin();rok&&it!=titles.end();++it){
-   std::string name=it->second;
-   for(size_t i=0;i<name.size();i++)if(name[i]=='\\t'||name[i]=='\\r'||name[i]=='\\n')name[i]=' ';
-   if(fprintf(rf,"%s\\t%s\\t\\t\\t\\t\\tunknown\\tGameDB-Redump\\n",it->first.c_str(),name.c_str())<0)rok=false;
+   std::map<std::string,std::string>::const_iterator old=previous.find(it->first);
+   if(old!=previous.end()){
+    if(fputs(old->second.c_str(),rf)<0)rok=false;
+   }else{
+    std::string name=it->second;
+    for(size_t i=0;i<name.size();i++)if(name[i]=='\t'||name[i]=='\r'||name[i]=='\n')name[i]=' ';
+    if(fprintf(rf,"%s\t%s\t\t\t\t\tunknown\tGameDB-Redump\n",it->first.c_str(),name.c_str())<0)rok=false;
+   }
   }
   if(fflush(rf)!=0)rok=false;
   if(fclose(rf)!=0)rok=false;
