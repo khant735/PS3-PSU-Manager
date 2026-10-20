@@ -9,7 +9,7 @@
 	<value name="PS3_SYSTEM_VER" type="string">01.8000</value>
 	<value name="RESOLUTION" type="integer">63</value>
 	<value name="SOUND_FORMAT" type="integer">279</value>
-	<value name="TITLE" type="string">PS2 .psu Save Manager v1.63</value>
+	<value name="TITLE" type="string">PS2 .psu Save Manager v1.63T</value>
 	<value name="TITLE_ID" type="string">PSU000001</value>
 	<value name="VERSION" type="string">01.63</value>
 </sfo>
