@@ -4934,6 +4934,20 @@ static void homebrew_catalogue_download_selected(){int ai=g_homebrew_asset_selec
 
 
 /* User-triggered, bounded HTTPS detail-page retrieval. Never guess links. */
+static int saves_refresh_game_listing(const gfs_save_t *entry){
+ if(!entry)return -1;
+ unsigned gid=0,sid=0;
+ if(!gfs_parse_save_page_ids(entry->page_url,&gid,&sid))return -1;
+ char listing[384];
+ snprintf(listing,sizeof(listing),"%s",entry->page_url);
+ char *suffix=strstr(listing,"/saves/");
+ if(suffix)* (suffix+6)=0;
+ else {
+  char *end=strpbrk(listing,"?#");if(end)*end=0;
+ }
+ if(downloader_net_init()!=0)return -2;
+ return gfs_crawl_listing_https(listing,g_saves_index_path,entry->game,entry->region,GFS_MAX_ENTRIES);
+}
 static int saves_fetch_detail_page(const char *page_url,const char *game,const char *region){
  unsigned gid=0,sid=0;
  if(!gfs_parse_save_page_ids(page_url,&gid,&sid)||!sid)return -1;
@@ -5612,7 +5626,13 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
  }
  if(g_saves_active){
   if(press&B_SQUARE){
-   if(g_saves_level==3){
+   if(g_saves_level==2){
+    char row_label[256];int id=saves_row(g_saves_selected,row_label,sizeof(row_label));
+    if(id>=0){int n=saves_refresh_game_listing(&g_saves_entries[id]);
+     if(n>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs: %d pages processed",n);}
+     else snprintf(status_line,sizeof(status_line),"GameFAQs: listing refresh failed (%d)",n);
+    }
+   }else if(g_saves_level==3){
     char row_label[256];int id=saves_row(g_saves_selected,row_label,sizeof(row_label));
     if(id>=0){
      int n=saves_fetch_detail_page(g_saves_entries[id].page_url,g_saves_entries[id].game,g_saves_entries[id].region);
