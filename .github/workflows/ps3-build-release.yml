@@ -1,12 +1,17 @@
-name: PS3 PSU Manager — Build and Download
+name: PS3 PSU Manager — Build and Publish
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: 'Publish direct ELF, SELF and PKG release assets after a successful build'
+        type: boolean
+        default: true
   push:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -57,3 +62,17 @@ jobs:
           name: PS3-PSU-Manager-v1.63-ELF-SELF-PKG
           path: dist/*
           if-no-files-found: error
+      - name: Publish individual files to GitHub Release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          TAG=v1.63
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+            gh release upload "$TAG" dist/PS3-PSU-Manager-v1.63.elf dist/PS3-PSU-Manager-v1.63.self dist/PS3-PSU-Manager-v1.63.pkg dist/SHA256SUMS.txt --clobber
+          else
+            gh release create "$TAG" dist/PS3-PSU-Manager-v1.63.elf dist/PS3-PSU-Manager-v1.63.self dist/PS3-PSU-Manager-v1.63.pkg dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "PS3 PSU Manager v1.63" --notes "PS3DEV/PSL1GHT build. Contains unencrypted ELF, SELF, installable PKG and SHA-256 checksums. Real PS3 hardware testing is not yet verified." --latest
+          fi
