@@ -70,6 +70,10 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
   int dup=0;
   for(int j=0;j<count;j++){
    if(same(&entries[j],&incoming[i])){dup=1;break;}
+   /* Never regress a verified download to an unverified PAGE row. */
+   if(!strcmp(entries[j].page_url,incoming[i].page_url)&&
+      !strcmp(incoming[i].format,"PAGE")&&
+      entries[j].download_url[0]){dup=1;break;}
    /* Replace an unverified page record only when an actual file URL
     * has been extracted. Keep multiple distinct downloads per page. */
    if(!strcmp(entries[j].page_url,incoming[i].page_url)&&
