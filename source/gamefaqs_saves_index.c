@@ -63,8 +63,8 @@ int gfs_parse_index(const char *data,gfs_save_t *out,int cap){
    The save-detail page is NOT a direct download URL. */
 int gfs_parse_save_page_ids(const char *url, unsigned *game_id, unsigned *save_id){
  if(!safe_url(url)||!game_id||!save_id)return 0;
- const char *p=strstr(url+8,"/ps2/");
- if(!p)return 0;
+ const char *p=strchr(url+8,'/');
+ if(!p||strncmp(p,"/ps2/",5))return 0;
  p+=5;
  unsigned game=0,save=0;
  if(!isdigit((unsigned char)*p))return 0;
