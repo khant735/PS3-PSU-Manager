@@ -1,6 +1,6 @@
 # PS3 PSU Manager
 
-A PlayStation 3 homebrew application for browsing, inspecting, organising, extracting, creating and downloading PlayStation 2 memory-card saves. Intended for compatible PS3 custom firmware.
+A PlayStation 3 homebrew application for managing PlayStation 2 memory-card saves without a PC, including browsing, inspecting, organising, extracting, creating and downloading save archives. Designed for compatible PS3 custom firmware, it preserves the original file format, filename and region when downloading saves.
 
 > **Development status:** The latest GameFAQs integration has compiled but has not been validated against live GameFAQs responses or tested on real PS3 hardware. Opening saves is read-only; conversion is only performed when explicitly requested.
 
@@ -17,10 +17,6 @@ Official numbered releases. These are separate from experimental development bui
 **[Browse the complete Development Builds index](docs/DEVELOPMENT_BUILDS.md)**
 
 Each development build has a unique `dev-v?.??-build.RUN.ATTEMPT` tag and its own ELF, SELF, PKG and SHA-256 files. The index is automatically regenerated from GitHub releases after each successful build.
-
-## Intended purpose
-
-Manage PS2 save data on a PS3 without needing a PC for routine browsing, extraction, archive creation and supported downloads. Preserve the original file format, name and region on download.
 
 ## Current capabilities
 
