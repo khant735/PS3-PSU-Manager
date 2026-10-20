@@ -24,5 +24,6 @@ int main(int argc,char **argv){
  char data[4096];size_t n=fread(data,1,sizeof(data)-1,f);fclose(f);data[n]=0;
  gfs_save_t entries[8];assert(gfs_parse_index(data,entries,8)>=1);
  assert(strstr(data,"example.psu")!=NULL);
+ assert(strstr(data,"999999-other")==NULL);
  remove(path);puts("GameFAQs crawl OK");return 0;
 }
