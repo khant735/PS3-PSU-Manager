@@ -26,7 +26,7 @@ GameTDB is intentionally excluded as a PS2 catalogue source.
 | PS2 Save Tools | https://www.ps2savetools.com/downloads/saves/ | inspect actual downloadable files | planned |
 | CodeJunkies / Datel Powersaves and Community Saves | historical completion and cheat-enhanced saves | research only; no verified live feed |
 | CodeBreaker, GameShark, Xploder | historical save archives, not just cheat codes | research only |
-| Internet Archive Wayback | https://web.archive.org/ | recover historical catalogue and attachment URLs | research only; verify attachment bytes separately |
+| PS2-Home forum | https://www.ps2-home.com/forum/index.php | save/homebrew forum threads and attachments | access restricted: HTTP 403 observed 2026-10-20; do not claim links verified |\n| Internet Archive Wayback | https://web.archive.org/ | recover historical catalogue and attachment URLs | research only; verify attachment bytes separately |
 | GameHacking.org | https://gamehacking.org/ | cheat codes and identifiers, NOT presumed downloadable saves | separate cheat-data candidate |
 
 Swap Magic is not treated as a verified save-download catalogue.
@@ -41,3 +41,23 @@ Swap Magic is not treated as a verified save-download catalogue.
 - On parse/download/write failure preserve existing database files; stage new files before atomic replacement.
 - Crawl incrementally on PS3 with bounded response size, checkpointing and deduplication; avoid unbounded RAM use.
 - Test against saved fixtures before enabling a new provider; no untested provider should be reported as operational.
+
+## Provider completion gate
+A provider is **complete** only when discovery, parsing, bounded fetching, retry/backoff, durable checkpoints, provenance, deduplication, failure preservation, fixture tests, real-hardware validation and an installable build have been verified. Merely adding a URL or parser does not qualify.
+
+### PS2-Home investigation
+- Homepage retrieval returned HTTP 403 Forbidden on 2026-10-20 from the current automated environment.
+- Cause is not established: forum permissions, WAF/Cloudflare, account requirements or server configuration may apply.
+- Do not bypass anti-bot protection, automatically submit credentials or label inaccessible attachments as valid downloads.
+- Capture only publicly accessible metadata, retain source links and mark inaccessible files as unverified.
+- Archive snapshots may identify historical links, but the attachment itself must be retrievable and its content validated before offering it.
+
+### Completion sequence
+1. Validate and stabilize the existing GameDB/Redump importer with fixtures and actual builds.
+2. Parse regional PSX DataCenter lists, then PCSX2 Wiki and SerialStation; maintain release/disc identity separately from canonical game identity.
+3. Import richer GameDB release data, dates and revisions; reconcile conflicts without inventing fields.
+4. Add LaunchBox and secondary metadata sources where access terms allow.
+5. Build GameFAQs game/save discovery, incremental checkpoints and link verification; index save metadata without downloading files automatically.
+6. Evaluate PS2 Save Tools and historical CodeJunkies/CodeBreaker/GameShark/Xploder archives; classify Wayback and PS2-Home failures accurately.
+7. Integrate search, regional filtering, format conversion, validation and safe downloading in the PS3 UI.
+8. Compile ELF/SELF/PKG, run fixture tests and hardware/emulator checks, publish only verified outputs.
