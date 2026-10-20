@@ -30,3 +30,6 @@ python3 tests/test_catalogue_layout.py
 python3 tests/test_homebrew_catalogue_layout.py
 g++ -std=c++17 -Wall -Wextra -Iinclude tests/zip_archive_test_driver.cpp source/zip_extract.cpp -lz -o "$test_dir/zip-archive"
 python3 tests/test_zip_archive.py "$test_dir/zip-archive" "$test_dir"
+
+cc -std=c99 -Wall -Wextra -Isource tests/test_gamefaqs_discovery.c source/gamefaqs_html_native.c source/gamefaqs_saves_index.c -o "$test_dir/gamefaqs-discovery"
+"$test_dir/gamefaqs-discovery"
