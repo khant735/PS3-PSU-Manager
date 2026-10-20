@@ -4943,7 +4943,7 @@ static int saves_fetch_detail_page(const char *page_url,const char *game,const c
  curl_easy_setopt(c,CURLOPT_URL,page_url);
  curl_easy_setopt(c,CURLOPT_WRITEFUNCTION,catalogue_http_write);
  curl_easy_setopt(c,CURLOPT_WRITEDATA,&data);
- curl_easy_setopt(c,CURLOPT_USERAGENT,"PS3-PSU-Manager/1.63 (GameFAQs Saves)");
+ curl_easy_setopt(c,CURLOPT_USERAGENT,"PS3-PSU-Manager/1.63T (GameFAQs Saves)");
  curl_easy_setopt(c,CURLOPT_FOLLOWLOCATION,0L);
  curl_easy_setopt(c,CURLOPT_CONNECTTIMEOUT,10L);
  curl_easy_setopt(c,CURLOPT_TIMEOUT,25L);
@@ -5039,7 +5039,7 @@ static void draw_saves_catalogue(){
   text_centered_bounded(x+24,yy+1,w-48,rowh-2,label,idx==g_saves_selected?0xFFFFFFFFu:0xFFE1EBF2u,g_body_scale);
  }
  int fy=y+header+(visible?visible:1)*rowh+7;
- text_centered_bounded(x+18,fy,w-36,24,g_saves_count?"X OPEN / DOWNLOAD    O BACK":"No verified GameFAQs index installed",0xFF9EF2B0u,g_help_scale);
+ text_centered_bounded(x+18,fy,w-36,24,g_saves_count?"X OPEN / DOWNLOAD    O BACK":"GameFAQs index missing/empty - separate from Game DB",0xFF9EF2B0u,g_help_scale);
  text_centered_bounded(x+18,fy+25,w-36,24,"Direct file links only; saves are never converted automatically",0xFFBBD1E0u,g_help_scale);
 }
 static void draw_homebrew_catalogue(){
