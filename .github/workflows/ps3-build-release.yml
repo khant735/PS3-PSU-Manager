@@ -140,5 +140,5 @@ jobs:
             # The manual checkout intentionally has no credential helper.
             # Authenticate only this push using the job-scoped GITHUB_TOKEN.
             # Avoid changing the remote URL or saving the token in Git config.
-            git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\\n')" push origin "HEAD:main"
+            git -c http.extraheader="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')" push origin "HEAD:main"
           fi
