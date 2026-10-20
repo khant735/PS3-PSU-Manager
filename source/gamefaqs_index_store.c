@@ -18,7 +18,8 @@ static int valid(const gfs_save_t *e){
  clean(e->page_url,sizeof(e->page_url))&&
  clean(e->download_url,sizeof(e->download_url))&&
  gfs_parse_save_page_ids(e->page_url,&(unsigned){0},&(unsigned){0})&&
- (!*e->download_url||gfs_download_allowed(e->download_url));
+ (!*e->download_url||gfs_download_allowed(e->download_url))&&
+ (strcmp(e->format,"PAGE")||!*e->download_url);
 }
 static int same(const gfs_save_t *a,const gfs_save_t *b){
  return !strcmp(a->page_url,b->page_url)&&!strcmp(a->download_url,b->download_url);
