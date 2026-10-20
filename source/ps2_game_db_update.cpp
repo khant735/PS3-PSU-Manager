@@ -60,7 +60,7 @@ static bool parse_titles(const std::string &s,std::map<std::string,std::string> 
  if(s[p]==','){p++;continue;}if(s[p]=='}'){p++;ws(s,p);return p==s.size();}return false;
  }return false;
 }
-static void merge_redump_xml(const std::string &s,std::map<std::string,std::string> &titles){
+static void merge_redump_xml(const std::string &s,std::map<std::string,std::string> &titles,std::map<std::string,std::string> &sources){
  // Redump names may contain serial in parentheses; keep existing GameDB names authoritative.
  size_t pos=0;while((pos=s.find("<game ",pos))!=std::string::npos){
  size_t end=s.find('>',pos);if(end==std::string::npos)break;
@@ -69,7 +69,7 @@ static void merge_redump_xml(const std::string &s,std::map<std::string,std::stri
  std::string name=s.substr(attr,q-attr);pos=end+1;
  for(size_t i=0;i+10<=name.size();i++){
  std::string id=name.substr(i,10);if(serial(id)&&titles.find(id)==titles.end()){
- titles[id]=name;break;
+ titles[id]=name;sources[id]="Redump";break;
  }
  }
  }
@@ -78,19 +78,21 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
  if(message&&cap)message[0]=0;
  if(!target)return -1;
  std::string json;std::map<std::string,std::string> titles;
+ std::map<std::string,std::string> sources;
  if(download(GAME_URL,json,16*1024*1024)!=0){
  if(message&&cap)snprintf(message,cap,"GameDB download failed: %s; previous DB preserved",last_download_error);return -1;
  }
  if(!parse_titles(json,titles)||titles.size()<1000){
  if(message&&cap)snprintf(message,cap,"GameDB JSON schema/count invalid (%lu titles); previous DB preserved",(unsigned long)titles.size());return -1;
  }
+ for(std::map<std::string,std::string>::const_iterator it=titles.begin();it!=titles.end();++it)sources[it->first]="GameDB";
  size_t primary=titles.size();std::string xml;
- if(download(REDUMP_URL,xml,32*1024*1024)==0&&xml.find("<game ")!=std::string::npos)merge_redump_xml(xml,titles);
+ if(download(REDUMP_URL,xml,32*1024*1024)==0&&xml.find("<game ")!=std::string::npos)merge_redump_xml(xml,titles,sources);
  // Never shrink the database on upstream errors or removals.
  FILE *old=fopen(target,"rb");if(old){char line[2048];while(fgets(line,sizeof(line),old)){
  char *tab=strchr(line,'\t');if(!tab)continue;*tab=0;
  std::string id(line),title(tab+1);while(!title.empty()&&(title[title.size()-1]=='\n'||title[title.size()-1]=='\r'))title.resize(title.size()-1);
- if(serial(id)&&!title.empty()&&titles.find(id)==titles.end())titles[id]=title;
+ if(serial(id)&&!title.empty()&&titles.find(id)==titles.end()){titles[id]=title;sources[id]="Local";}
  }fclose(old);}
  std::string temp=std::string(target)+".part";
  FILE *f=fopen(temp.c_str(),"wb");if(!f){if(message&&cap)snprintf(message,cap,"Cannot open database temporary file");return -1;}
@@ -136,7 +138,7 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
    }else{
     std::string name=it->second;
     for(size_t i=0;i<name.size();i++)if(name[i]=='\t'||name[i]=='\r'||name[i]=='\n')name[i]=' ';
-    if(fprintf(rf,"%s\t%s\t\t\t\t\tunknown\tGameDB-Redump\n",it->first.c_str(),name.c_str())<0)rok=false;
+    if(fprintf(rf,"%s\t%s\t\t\t\t\tunknown\t%s\n",it->first.c_str(),name.c_str(),sources[it->first].c_str())<0)rok=false;
    }
   }
   /* Preserve records for serials no longer returned by an upstream source. */
