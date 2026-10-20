@@ -63,6 +63,17 @@ jobs:
           cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63T.pkg
           cd dist
           sha256sum *.elf *.self *.pkg > SHA256SUMS.txt
+      - name: Upload compiled test binaries as downloadable Actions artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PS3-PSU-Manager-v1.63T-build
+          path: |
+            dist/PS3-PSU-Manager-v1.63T.elf
+            dist/PS3-PSU-Manager-v1.63T.self
+            dist/PS3-PSU-Manager-v1.63T.pkg
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
       - name: Install GitHub CLI in PS3DEV container
         if: github.event_name == 'workflow_dispatch' && inputs.publish_release
         run: |
