@@ -46,3 +46,9 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  *html=b.data;*length=b.used;return 200;
 }
 void gfs_curl_release(char *html,void *ctx){(void)ctx;free(html);}
+
+int gfs_crawl_listing_https(const char *listing_url,const char *index_path,
+ const char *game,const char *region,int maximum_entries){
+ return gfs_crawl_listing(listing_url,index_path,game,region,maximum_entries,
+                          gfs_curl_fetch,gfs_curl_release,NULL);
+}
