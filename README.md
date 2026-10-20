@@ -16,13 +16,13 @@ Official numbered releases use tags such as `v1.63` and `v1.64`. These are separ
 
 ### Development builds — experimental prereleases
 
-**[Download latest confirmed development prerelease](https://github.com/khant735/PS3-PSU-Manager/releases/tag/dev-v1.63-build.92.1)**
+**[Browse the complete Development Builds index](docs/DEVELOPMENT_BUILDS.md)**
 
-Development builds have unique tags such as `dev-v1.63-build.91.1`. Each successful build is published separately with ELF, SELF, PKG and SHA-256 checksums. Previous builds are retained rather than replaced. These are intended for testing, not assumed stable.
+Each development build has a unique `dev-v1.63-build.RUN.ATTEMPT` tag and its own ELF, SELF, PKG and SHA-256 files. The index is automatically regenerated from GitHub releases after each successful build, without using GitHub's unreliable release search filter.
 
-[Previous development build (91.1)](https://github.com/khant735/PS3-PSU-Manager/releases/tag/dev-v1.63-build.91.1) · **[View all releases](https://github.com/khant735/PS3-PSU-Manager/releases)** · **[View build workflows](https://github.com/khant735/PS3-PSU-Manager/actions)**
+**[View all GitHub releases](https://github.com/khant735/PS3-PSU-Manager/releases)** · **[View build workflows](https://github.com/khant735/PS3-PSU-Manager/actions)**
 
-GitHub has a single Releases area: the links above provide convenient navigation, not separate GitHub release folders. Back up save data before testing prereleases.
+Back up saves before testing development builds.
 
 ## Intended purpose
 
