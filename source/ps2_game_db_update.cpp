@@ -118,7 +118,9 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
    if(serial(id)){
     std::string row(line);
     if(row.find('\n')==std::string::npos)continue;
-    previous[id]=row;
+    /* Only preserve structurally valid eight-column release rows. */
+    unsigned tabs=0;for(size_t j=0;j<row.size();j++)if(row[j]=='\t')tabs++;
+    if(tabs==7)previous[id]=row;
    }
   }
   fclose(existing);
@@ -136,6 +138,10 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
     for(size_t i=0;i<name.size();i++)if(name[i]=='\t'||name[i]=='\r'||name[i]=='\n')name[i]=' ';
     if(fprintf(rf,"%s\t%s\t\t\t\t\tunknown\tGameDB-Redump\n",it->first.c_str(),name.c_str())<0)rok=false;
    }
+  }
+  /* Preserve records for serials no longer returned by an upstream source. */
+  for(std::map<std::string,std::string>::const_iterator it=previous.begin();rok&&it!=previous.end();++it){
+   if(titles.find(it->first)==titles.end()&&fputs(it->second.c_str(),rf)<0)rok=false;
   }
   if(fflush(rf)!=0)rok=false;
   if(fclose(rf)!=0)rok=false;
