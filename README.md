@@ -12,13 +12,13 @@ A PlayStation 3 homebrew application for browsing, inspecting, organising, extra
 
 **[Download latest stable release](https://github.com/khant735/PS3-PSU-Manager/releases/latest)**
 
-Official numbered releases use tags such as `v1.63` and `v1.64`. These are separate from experimental development builds. The latest stable release may not contain the newest experimental catalogue changes.
+Official numbered releases. These are separate from experimental development builds. The latest stable release may not contain the newest experimental changes.
 
 ### Development builds — experimental prereleases
 
 **[Browse the complete Development Builds index](docs/DEVELOPMENT_BUILDS.md)**
 
-Each development build has a unique `dev-v1.63-build.RUN.ATTEMPT` tag and its own ELF, SELF, PKG and SHA-256 files. The index is automatically regenerated from GitHub releases after each successful build, without using GitHub's unreliable release search filter.
+Each development build has a unique `dev-v?.??-build.RUN.ATTEMPT` tag and its own ELF, SELF, PKG and SHA-256 files. The index is automatically regenerated from GitHub releases after each successful build.
 
 ## Intended purpose
 
