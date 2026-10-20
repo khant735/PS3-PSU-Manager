@@ -2,6 +2,8 @@
 #include "gamefaqs_discovery_pipeline.h"
 #include "gamefaqs_html_native.h"
 #include "gamefaqs_saves_index.h"
+#include "gamefaqs_index_store.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #define GFS_HTML_LIMIT (1024U*1024U)
@@ -28,9 +30,20 @@ int gfs_crawl_listing(const char *listing_url,const char *index_path,
  if(!urls){release(html,ctx);return -1;}
  int found=gfs_discover_save_links(html,urls,GFS_DETAIL_LIMIT);
  if(found<0){free(urls);release(html,ctx);return -1;}
- int result=gfs_ingest_html(index_path,html,NULL,game,region,maximum_entries);
  release(html,ctx);
- if(result<0){free(urls);return -1;}
+ int result=0;
+ for(int i=0;i<found;i++){
+  unsigned dg=0,ds=0;
+  if(!gfs_parse_save_page_ids(urls[i],&dg,&ds)||dg!=gid||!ds)continue;
+  gfs_save_t page={0};
+  snprintf(page.game,sizeof(page.game),"%s",game);
+  snprintf(page.region,sizeof(page.region),"%s",region);
+  snprintf(page.format,sizeof(page.format),"PAGE");
+  snprintf(page.description,sizeof(page.description),"GameFAQs save %u",ds);
+  snprintf(page.page_url,sizeof(page.page_url),"%s",urls[i]);
+  result=gfs_merge_index_file(index_path,&page,1,maximum_entries);
+  if(result<0){free(urls);return -1;}
+ }
  int processed=1;
  for(int i=0;i<found;i++){
   unsigned detail_game=0,detail_id=0;
