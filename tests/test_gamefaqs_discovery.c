@@ -18,6 +18,13 @@ int main(void){
  assert(gfs_discover_save_links("",urls,4)==0);
  assert(gfs_discover_save_links(NULL,urls,4)==-1);
  assert(gfs_discover_save_links(html,urls,1)==1);
+ gfs_save_t entries[4];
+ const char *pages="<a href=\'/ps2/123456-example-game/saves\'>listing</a><a href=\'/ps2/123456-example-game/saves/987654\'>save</a>";
+ assert(gfs_index_save_pages(pages,"Example Game","USA",entries,4)==1);
+ assert(strcmp(entries[0].format,"PAGE")==0);
+ assert(entries[0].download_url[0]==0);
+ assert(strstr(entries[0].page_url,"/saves/987654")!=NULL);
+ assert(gfs_index_save_pages(pages,"bad\\tgame","USA",entries,4)==-1);
  puts("GameFAQs save link discovery OK");
  return 0;
 }
