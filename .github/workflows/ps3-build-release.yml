@@ -58,9 +58,9 @@ jobs:
         run: |
           set -eu
           mkdir -p dist
-          cp ps3psumanager.elf dist/PS3-PSU-Manager-v1.63.elf
-          cp ps3psumanager.self dist/PS3-PSU-Manager-v1.63.self
-          cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63.pkg
+          cp ps3psumanager.elf dist/PS3-PSU-Manager-v1.63T.elf
+          cp ps3psumanager.self dist/PS3-PSU-Manager-v1.63T.self
+          cp ps3psumanager.pkg dist/PS3-PSU-Manager-v1.63T.pkg
           cd dist
           sha256sum *.elf *.self *.pkg > SHA256SUMS.txt
       - name: Install GitHub CLI in PS3DEV container
@@ -79,10 +79,10 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -eu
-          TAG=v1.63
+          TAG=v1.63T
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --draft=false --prerelease=false --latest
-            gh release upload "$TAG" dist/PS3-PSU-Manager-v1.63.elf dist/PS3-PSU-Manager-v1.63.self dist/PS3-PSU-Manager-v1.63.pkg dist/SHA256SUMS.txt --clobber
+            gh release edit "$TAG" --draft=false --prerelease=true
+            gh release upload "$TAG" dist/PS3-PSU-Manager-v1.63T.elf dist/PS3-PSU-Manager-v1.63T.self dist/PS3-PSU-Manager-v1.63T.pkg dist/SHA256SUMS.txt --clobber
           else
-            gh release create "$TAG" dist/PS3-PSU-Manager-v1.63.elf dist/PS3-PSU-Manager-v1.63.self dist/PS3-PSU-Manager-v1.63.pkg dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "PS3 PSU Manager v1.63" --notes "PS3DEV/PSL1GHT build. Contains unencrypted ELF, SELF, installable PKG and SHA-256 checksums. Real PS3 hardware testing is not yet verified." --latest
+            gh release create "$TAG" dist/PS3-PSU-Manager-v1.63T.elf dist/PS3-PSU-Manager-v1.63T.self dist/PS3-PSU-Manager-v1.63T.pkg dist/SHA256SUMS.txt --target "$GITHUB_SHA" --title "PS3 PSU Manager v1.63T" --notes "Test build: GameDB network/validation diagnostics and clearer GameFAQs index status. GameFAQs index acquisition is not yet implemented. Real PS3 testing required." --prerelease
           fi
