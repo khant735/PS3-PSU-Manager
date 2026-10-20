@@ -1,6 +1,6 @@
 # PS3 PSU Manager
 
-A PlayStation 3 homebrew application for browsing, inspecting, organising, extracting, creating and downloading PlayStation 2 memory-card saves. Intended for compatible PS3 custom firmware. RPCS3 support is under evaluation.
+A PlayStation 3 homebrew application for browsing, inspecting, organising, extracting, creating and downloading PlayStation 2 memory-card saves. Intended for compatible PS3 custom firmware.
 
 > **Development status:** The latest GameFAQs integration has compiled but has not been validated against live GameFAQs responses or tested on real PS3 hardware. Opening saves is read-only; conversion is only performed when explicitly requested.
 
