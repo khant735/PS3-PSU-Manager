@@ -16,20 +16,23 @@ static size_t collect(char *ptr,size_t size,size_t count,void *ctx){
  if(n>b->max || b->data.size()>b->max-n)return 0;
  b->data.append(ptr,n);return n;
 }
+static char last_download_error[192];
 static int download(const char *url,std::string &out,size_t limit){
- CURL *c=curl_easy_init();if(!c)return -1;
- Buffer b;b.max=limit;
+ last_download_error[0]=0;
+ CURL *c=curl_easy_init();if(!c){snprintf(last_download_error,sizeof(last_download_error),"curl initialization failed");return -1;}
+ Buffer b;b.max=limit;char curl_error[CURL_ERROR_SIZE]={0};
+ curl_easy_setopt(c,CURLOPT_ERRORBUFFER,curl_error);
  curl_easy_setopt(c,CURLOPT_URL,url);curl_easy_setopt(c,CURLOPT_WRITEFUNCTION,collect);
  curl_easy_setopt(c,CURLOPT_WRITEDATA,&b);curl_easy_setopt(c,CURLOPT_FOLLOWLOCATION,1L);
  curl_easy_setopt(c,CURLOPT_MAXREDIRS,5L);curl_easy_setopt(c,CURLOPT_CONNECTTIMEOUT,15L);
  curl_easy_setopt(c,CURLOPT_TIMEOUT,180L);curl_easy_setopt(c,CURLOPT_FAILONERROR,1L);
  curl_easy_setopt(c,CURLOPT_SSL_VERIFYPEER,1L);curl_easy_setopt(c,CURLOPT_SSL_VERIFYHOST,2L);
  curl_easy_setopt(c,CURLOPT_SSLVERSION,CURL_SSLVERSION_TLSv1_2);
- curl_easy_setopt(c,CURLOPT_USERAGENT,"PS3-PSU-Manager/1.63 GameDB-Updater");
+ curl_easy_setopt(c,CURLOPT_USERAGENT,"PS3-PSU-Manager/1.63T GameDB-Updater");
  /* Same installed CA bundle as the existing HTTPS downloader. */
  curl_easy_setopt(c,CURLOPT_CAINFO,"/dev_hdd0/game/PSU000001/USRDIR/cacert.pem");
  CURLcode code=curl_easy_perform(c);long http=0;curl_easy_getinfo(c,CURLINFO_RESPONSE_CODE,&http);
- curl_easy_cleanup(c);if(code!=CURLE_OK||http!=200)return -1;out.swap(b.data);return 0;
+ curl_easy_cleanup(c);if(code!=CURLE_OK||http!=200){snprintf(last_download_error,sizeof(last_download_error),"HTTP %ld, curl %d: %.110s",http,(int)code,curl_error[0]?curl_error:curl_easy_strerror(code));return -1;}out.swap(b.data);return 0;
 }
 static bool serial(const std::string &s){if(s.size()!=10||s[4]!='-')return false;
  for(int i=0;i<4;i++)if(!isalpha((unsigned char)s[i]))return false;
@@ -75,8 +78,11 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
  if(message&&cap)message[0]=0;
  if(!target)return -1;
  std::string json;std::map<std::string,std::string> titles;
- if(download(GAME_URL,json,16*1024*1024)!=0||!parse_titles(json,titles)||titles.size()<1000){
- if(message&&cap)snprintf(message,cap,"GameDB download/validation failed; previous DB preserved");return -1;
+ if(download(GAME_URL,json,16*1024*1024)!=0){
+ if(message&&cap)snprintf(message,cap,"GameDB download failed: %s; previous DB preserved",last_download_error);return -1;
+ }
+ if(!parse_titles(json,titles)||titles.size()<1000){
+ if(message&&cap)snprintf(message,cap,"GameDB JSON schema/count invalid (%lu titles); previous DB preserved",(unsigned long)titles.size());return -1;
  }
  size_t primary=titles.size();std::string xml;
  if(download(REDUMP_URL,xml,32*1024*1024)==0&&xml.find("<game ")!=std::string::npos)merge_redump_xml(xml,titles);
