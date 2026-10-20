@@ -129,6 +129,7 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
  }
  std::string release_tmp=releases+".part";
  FILE *rf=fopen(release_tmp.c_str(),"wb");
+ bool release_written=false;
  if(rf){
   bool rok=fputs("# serial\ttitle\tregion\tedition\trevision\trelease_date\tdate_precision\tsource\n",rf)>=0;
   for(std::map<std::string,std::string>::const_iterator it=titles.begin();rok&&it!=titles.end();++it){
@@ -147,8 +148,12 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
   }
   if(fflush(rf)!=0)rok=false;
   if(fclose(rf)!=0)rok=false;
-  if(!rok||rename(release_tmp.c_str(),releases.c_str())!=0)remove(release_tmp.c_str());
+  if(rok&&rename(release_tmp.c_str(),releases.c_str())==0)release_written=true;
+  else remove(release_tmp.c_str());
  }
- if(message&&cap)snprintf(message,cap,"%lu titles (%lu GameDB); update complete",(unsigned long)titles.size(),(unsigned long)primary);
+ if(message&&cap){
+  if(release_written)snprintf(message,cap,"%lu titles (%lu GameDB); release index updated",(unsigned long)titles.size(),(unsigned long)primary);
+  else snprintf(message,cap,"%lu titles updated; release index write failed (old index preserved)",(unsigned long)titles.size());
+ }
  return (int)titles.size();
 }
