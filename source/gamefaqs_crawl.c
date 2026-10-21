@@ -32,6 +32,7 @@ int gfs_crawl_listing(const char *listing_url,const char *index_path,
  if(found<0){free(urls);release(html,ctx);return -1;}
  release(html,ctx);
  int result=0;
+ int discovered=0;
  for(int i=0;i<found;i++){
   unsigned dg=0,ds=0;
   if(!gfs_parse_save_page_ids(urls[i],&dg,&ds)||dg!=gid||!ds)continue;
@@ -43,7 +44,10 @@ int gfs_crawl_listing(const char *listing_url,const char *index_path,
   snprintf(page.page_url,sizeof(page.page_url),"%s",urls[i]);
   result=gfs_merge_index_file(index_path,&page,1,maximum_entries);
   if(result<0){free(urls);return -1;}
+  discovered++;
  }
+ /* An HTTP 200 response is not proof that the saves listing was parsed. */
+ if(!discovered){free(urls);return -2;}
  int processed=1;
  for(int i=0;i<found;i++){
   unsigned detail_game=0,detail_id=0;
