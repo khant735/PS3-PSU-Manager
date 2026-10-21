@@ -9,6 +9,32 @@
 #include <map>
 #include <vector>
 
+/* Some PS3 filesystems reject rename() when the destination exists.
+ * Keep the previous DB in .bak until the new file has been installed.
+ * Never overwrite a stranded backup: it may be the only recoverable copy.
+ */
+static int replace_preserving_old(const std::string &temp,const std::string &target){
+ errno=0;
+ if(rename(temp.c_str(),target.c_str())==0)return 0;
+ if(errno!=EEXIST)return -1;
+ std::string backup=target+".bak";
+ FILE *check=fopen(backup.c_str(),"rb");
+ if(check){fclose(check);errno=EEXIST;return -1;}
+ if(rename(target.c_str(),backup.c_str())!=0)return -1;
+ if(rename(temp.c_str(),target.c_str())==0){
+  /* A failed cleanup leaves a harmless backup, never delete the new DB. */
+  remove(backup.c_str());
+  return 0;
+ }
+ int install_error=errno;
+ if(rename(backup.c_str(),target.c_str())!=0){
+  /* Leave both the staged new file and the old .bak for manual recovery. */
+  errno=EIO;
+  return -2;
+ }
+ errno=install_error;
+ return -1;
+}
 static const char *GAME_URL="https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.titles.json";
 static const char *REDUMP_URL="https://redump.info/datfile/ps2/serial,version";
 struct Buffer {std::string data;size_t max;};
@@ -120,10 +146,13 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
   if(message&&cap)snprintf(message,cap,"DB write/flush failed (errno %d); previous DB preserved",err);
   return -1;
  }
- if(rename(temp.c_str(),target)!=0){
+ int replacement=replace_preserving_old(temp,std::string(target));
+ if(replacement!=0){
   int err=errno;
-  remove(temp.c_str());
-  if(message&&cap)snprintf(message,cap,"DB replace failed (errno %d); previous DB preserved",err);
+  if(replacement!=-2)remove(temp.c_str());
+  if(message&&cap)snprintf(message,cap,replacement==-2?
+   "DB install/rollback failed (errno %d); inspect .bak and .part":
+   "DB replace failed (errno %d); previous DB preserved",err);
   return -1;
  }
  /* Build a per-serial release index locally. Preserve existing enriched records
@@ -172,8 +201,8 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
   }
   if(fflush(rf)!=0)rok=false;
   if(fclose(rf)!=0)rok=false;
-  if(rok&&rename(release_tmp.c_str(),releases.c_str())==0)release_written=true;
-  else remove(release_tmp.c_str());
+  if(rok&&replace_preserving_old(release_tmp,releases)==0)release_written=true;
+  else if(errno!=EIO)remove(release_tmp.c_str());
  }
  if(message&&cap){
   if(release_written)snprintf(message,cap,"%lu titles (%lu GameDB); release index updated",(unsigned long)titles.size(),(unsigned long)primary);
