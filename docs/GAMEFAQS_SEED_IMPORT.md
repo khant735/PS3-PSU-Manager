@@ -2,7 +2,11 @@
 
 The GameFAQs save index is **separate** from the 12,944-record PS2 game-title database. A game title or serial does not establish a GameFAQs save URL.
 
-## Bootstrapping an empty index
+## Built-in starter catalogue
+
+The app now ships with a small starter set of independently located GameFAQs PS2 save-listing page URLs. On first opening the GameFAQs catalogue with X, it imports those page-only entries automatically when the local index is empty. No external seed file is required for this initial list. The built-in entries are **not** confirmed downloadable files, and their region is deliberately marked unverified. This is not yet a comprehensive or remotely maintained worldwide index.
+
+## Optional additional seed listings
 
 Place a UTF-8, tab-separated text file at:
 
@@ -16,7 +20,7 @@ GAME TITLE<TAB>REGION<TAB>https://gamefaqs.gamespot.com/ps2/NNNNNN-game-slug/sav
 
 Replace the placeholders with **actual GameFAQs save-listing URLs verified by you**; the example above is a format template, not a real listing. The accepted HTTPS hosts are `gamefaqs.gamespot.com` and `www.gamefaqs.com`. Game names are display labels, and regions are labels such as `USA` or `Europe`, not proof of the actual save's region.
 
-Open **PS2 Saves — GameFAQs** with **X**. If the index is empty, available local seed listings are imported automatically on entry. **Square** remains available to retry the import or reload the index. Imported records are labelled **PAGE** and contain no download URL. Navigate to the game and region, then press **Square** to scan its listing for save-detail pages. Only explicit, permitted file links discovered from fetched pages are eligible for downloading. The existing index is merged, not cleared.
+Open **PS2 Saves — GameFAQs** with **X**. If the index is empty, the built-in listings and any available additional local seed listings are imported automatically on entry. **Square** remains available to retry the import or reload the index. Imported records are labelled **PAGE** and contain no download URL. Navigate to the game and region, then press **Square** to scan its listing for save-detail pages. Only explicit, permitted file links discovered from fetched pages are eligible for downloading. The existing index is merged, not cleared.
 
 A failed HTTPS request, 403, unavailable page, or absent direct file link must **not** be interpreted as zero saves existing. The importer cannot automatically discover the full GameFAQs PS2 catalogue from the game-title database, and this mechanism does not bypass login, robots, or access restrictions.
 
