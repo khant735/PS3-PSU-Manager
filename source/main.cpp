@@ -4969,11 +4969,11 @@ static int saves_import_category_pages(){
   successful++;
   const char *p=html;
   while((p=strstr(p,"href"))!=NULL){
-   const char *a=p+4;while(*a==' '||*a=='\\t')a++;
+   const char *a=p+4;while(*a==' '||*a==9)a++;
    if(*a++!='='){p+=4;continue;}
-   while(*a==' '||*a=='\\t')a++;
+   while(*a==' '||*a==9)a++;
    char quote=*a++;
-   if(quote!='\\''&&quote!='\\"'){p+=4;continue;}
+   if(quote!=39&&quote!=34){p+=4;continue;}
    const char *end=strchr(a,quote);if(!end)break;
    size_t n=(size_t)(end-a);p=end+1;
    if(n<15||n>=384)continue;
