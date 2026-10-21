@@ -3261,7 +3261,7 @@ static const char *icon_diag_origin(unsigned long geometry,unsigned long texture
 static void icon_diag_name(char out[65],const unsigned char *p){memcpy(out,p,64);out[64]=0;}
 static int sharkport_details_active(){return g_foreign_archive_view &&
  (endswith(g_foreign_source_path,".sps")||endswith(g_foreign_source_path,".xps")||endswith(g_foreign_source_path,".xpo"));}
-static int psu_metadata_page_count(){if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 4+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
+static int psu_metadata_page_count(){if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 5+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
 static void sjis_title_slice_ascii(const unsigned char*src,size_t begin,size_t end,char*out,size_t cap){if(begin>end){size_t t=begin;begin=end;end=t;}if(end>68)end=68;ps2_sjis_title_ascii(src+begin,end-begin,out,cap);}
 static void draw_psu_metadata_modal(){
  int x=g_margin+20,y=g_title_y+55,w=(int)g_width-g_margin*2-40,h=(int)g_height-y-g_margin-35;round_rect(x,y,w,h,10,0xF20A1622u);rect(x+3,y+3,w-6,3,0xFF2CCBFFu);
@@ -3302,6 +3302,22 @@ static void draw_psu_metadata_modal(){
    yy+=3;for(int i=0;i<4;i++){textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Light %d colour: R %.3f  G %.3f  B %.3f  A %.3f",i+1,meta_rdf32(ic+128+i*16),meta_rdf32(ic+132+i*16),meta_rdf32(ic+136+i*16),meta_rdf32(ic+140+i*16));yy+=lh;}
    yy+=3;textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Ambient light: R %.3f  G %.3f  B %.3f  A %.3f",meta_rdf32(ic+176),meta_rdf32(ic+180),meta_rdf32(ic+184),meta_rdf32(ic+188));
   }else textf(x+20,yy,0xFFFFA0A0u,g_body_scale,"icon.sys missing, short, or unreadable.");
+ }else if(g_psu_metadata_page==4+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0)){
+  /* Extra read-only metadata page. No guessed disc serial or release date. */
+  textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SAVE INFORMATION");yy+=lh+4;
+  char title[96]={0};
+  if(ic&&vs>=452&&memcmp(ic,"PS2D",4)==0)
+   ps2_sjis_title_ascii(ic+192,68,title,sizeof(title));
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Game / save title: %s",title[0]?title:"Not available");yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save description: Not available");yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save type: %s",g_foreign_archive_view?"Imported PS2 save archive":"PSU archive");yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Source file: %s",base_name(archive_path));yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save folder ID: %s",rr?"Not available":root.name);yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Game / disc serial: Not verified");yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Region: Not verified");yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Regional release date: Not available");yy+=lh;
+  textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Save folder ID is not necessarily the game disc serial.");yy+=lh;
+  textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Read-only details. No extraction or conversion performed.");
  }else if(sharkport_details_active() && g_psu_metadata_page==4+g_psu_meta_cache.entry_count){
   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SHARKPORT / X-PORT ICON COMPATIBILITY");yy+=lh+4;
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Source archive: %s",base_name(g_foreign_source_path));yy+=lh;
