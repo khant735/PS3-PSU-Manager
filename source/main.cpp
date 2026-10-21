@@ -4958,9 +4958,58 @@ static int saves_refresh_game_listing(const gfs_save_t *entry);
 static volatile int g_saves_scan_running=0,g_saves_scan_finished=0;
 static volatile int g_saves_scan_result=0;
 static gfs_save_t g_saves_scan_entry;
+/* Refresh the PS2 category catalogue in the background. Only explicit Saves
+ * links are imported; game slugs are used as fallback display labels. */
+static int saves_import_category_pages(){
+ int imported=0,successful=0;
+ for(int page=0;page<64;page++){
+  char url[128];snprintf(url,sizeof(url),"https://gamefaqs.gamespot.com/ps2/category/999-all?page=%d",page);
+  char *html=NULL;size_t length=0;
+  if(gfs_curl_fetch(url,&html,&length,NULL)!=200)continue;
+  successful++;
+  const char *p=html;
+  while((p=strstr(p,"href"))!=NULL){
+   const char *a=p+4;while(*a==' '||*a=='\\t')a++;
+   if(*a++!='='){p+=4;continue;}
+   while(*a==' '||*a=='\\t')a++;
+   char quote=*a++;
+   if(quote!='\\''&&quote!='\\"'){p+=4;continue;}
+   const char *end=strchr(a,quote);if(!end)break;
+   size_t n=(size_t)(end-a);p=end+1;
+   if(n<15||n>=384)continue;
+   char link[384];memcpy(link,a,n);link[n]=0;
+   if(!strncmp(link,"/ps2/",5)){
+    char absolute[384];snprintf(absolute,sizeof(absolute),"https://gamefaqs.gamespot.com%s",link);
+    snprintf(link,sizeof(link),"%s",absolute);
+   }else if(!strncmp(link,"//gamefaqs.gamespot.com/",25)){
+    char absolute[384];snprintf(absolute,sizeof(absolute),"https:%s",link);
+    snprintf(link,sizeof(link),"%s",absolute);
+   }
+   unsigned gid=0,sid=0;
+   if(!gfs_parse_save_page_ids(link,&gid,&sid)||sid)continue;
+   char *query=strpbrk(link,"?#");if(query)*query=0;
+   char *slug=strstr(link,"/ps2/");if(!slug)continue;
+   slug=strchr(slug+5,'-');if(!slug)continue;slug++;
+   char *stop=strstr(slug,"/saves");if(!stop)continue;
+   char title[128];size_t t=(size_t)(stop-slug);if(!t||t>=sizeof(title))continue;
+   memcpy(title,slug,t);title[t]=0;
+   for(size_t j=0;j<t;j++)if(title[j]=='-')title[j]=' ';
+   gfs_save_t seed={0};
+   snprintf(seed.game,sizeof(seed.game),"%s",title);
+   snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
+   snprintf(seed.format,sizeof(seed.format),"PAGE");
+   snprintf(seed.description,sizeof(seed.description),"GameFAQs catalogue listing (unverified)");
+   snprintf(seed.page_url,sizeof(seed.page_url),"%s",link);
+   if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
+  }
+  gfs_curl_release(html,NULL);
+ }
+ return successful?imported:-3;
+}
+static volatile int g_saves_category_mode=0;
 static void saves_listing_worker(void *unused){
  (void)unused;
- int result=saves_refresh_game_listing(&g_saves_scan_entry);
+ int result=g_saves_category_mode?saves_import_category_pages():saves_refresh_game_listing(&g_saves_scan_entry);
  g_saves_scan_result=result;
  __sync_synchronize();
  g_saves_scan_finished=1;
@@ -5733,18 +5782,24 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
   if(g_saves_scan_running&&g_saves_scan_finished){
    __sync_synchronize();
    int result=g_saves_scan_result;
-   g_saves_scan_running=0;g_saves_scan_finished=0;
-   if(result>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs: %d pages processed",result);}
-   else snprintf(status_line,sizeof(status_line),"GameFAQs: listing scan failed (%d)",result);
+   g_saves_scan_running=0;g_saves_scan_finished=0;g_saves_category_mode=0;
+   if(result>0){saves_load_index();snprintf(status_line,sizeof(status_line),g_saves_category_mode?"GameFAQs: %d catalogue links discovered":"GameFAQs: %d pages processed",result);}
+   else snprintf(status_line,sizeof(status_line),g_saves_category_mode?"GameFAQs: category refresh failed (%d)":"GameFAQs: listing scan failed (%d)",result);
    g_ui_dirty=1;
   }
   if(press&B_SQUARE){
-   if(g_saves_level==2){
+   if(g_saves_level==0&&!g_saves_scan_running){
+    if(downloader_net_init()!=0)snprintf(status_line,sizeof(status_line),"GameFAQs: network initialization failed");
+    else {g_saves_category_mode=1;g_saves_scan_finished=0;g_saves_scan_running=1;
+     sys_ppu_thread_t thread;
+     if(sysThreadCreate(&thread,saves_listing_worker,NULL,1500,0x10000,0,(char*)"gfs_category")!=0){g_saves_scan_running=0;g_saves_category_mode=0;snprintf(status_line,sizeof(status_line),"GameFAQs: unable to start category refresh");}
+     else snprintf(status_line,sizeof(status_line),"GameFAQs: refreshing PS2 catalogue pages 0-63...");}
+   }else if(g_saves_level==2){
     char row_label[256];int id=saves_row(g_saves_selected,row_label,sizeof(row_label));
     if(id>=0&&!g_saves_scan_running){
      if(downloader_net_init()!=0)snprintf(status_line,sizeof(status_line),"GameFAQs: network initialization failed");
      else {
-      g_saves_scan_entry=g_saves_entries[id];
+      g_saves_category_mode=0;g_saves_scan_entry=g_saves_entries[id];
       g_saves_scan_finished=0;g_saves_scan_running=1;
       sys_ppu_thread_t thread;
       if(sysThreadCreate(&thread,saves_listing_worker,NULL,1500,0x10000,0,(char*)"gfs_scan")!=0){
