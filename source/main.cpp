@@ -5767,7 +5767,20 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
    if(id>=0){
     if(g_saves_level==0)g_saves_bucket=id;
     if(g_saves_level==1)g_saves_game_index=id;
-    if(g_saves_level==2)g_saves_region_index=id;
+    if(g_saves_level==2){
+     g_saves_region_index=id;
+     /* Cross automatically starts the selected region's listing discovery.
+      * Keep network work off the controller/render thread. */
+     if(!g_saves_scan_running){
+      g_saves_scan_entry=g_saves_entries[id];
+      g_saves_scan_finished=0;g_saves_scan_running=1;
+      sys_ppu_thread_t scan_thread;
+      if(sysThreadCreate(&scan_thread,saves_listing_worker,NULL,1500,0x10000,0,(char*)"gfs_scan")!=0){
+       g_saves_scan_running=0;
+       snprintf(status_line,sizeof(status_line),"GameFAQs: unable to start listing scan");
+      }else snprintf(status_line,sizeof(status_line),"GameFAQs: loading available saves...");
+     }
+    }
     if(g_saves_level<3){g_saves_level++;g_saves_selected=g_saves_top=0;}
     else if(gfs_download_allowed(g_saves_entries[id].download_url)){
      char url[512];snprintf(url,sizeof(url),"%s",g_saves_entries[id].download_url);
