@@ -4974,6 +4974,39 @@ static int saves_fetch_detail_page(const char *page_url,const char *game,const c
  return merged<0?-4:merged;
 }
 
+/* Bootstrap an empty catalogue from explicit, locally supplied GameFAQs
+ * listing URLs. Each seed line is GAME<TAB>REGION<TAB>HTTPS_SAVE_PAGE_URL.
+ * A seed is a discovery target, not a verified downloadable save.
+ * Only same-game detail links discovered from live HTML enter the index.
+ */
+static int saves_import_seeds(){
+ const char *path="/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_SEEDS.tsv";
+ FILE *file=fopen(path,"rb");if(!file)return -2;
+ char line[1024];int accepted=0,invalid=0;
+ while(fgets(line,sizeof(line),file)){
+  if(line[0]=='#'||line[0]=='\n'||line[0]=='\r')continue;
+  if(!strchr(line,'\n')&&!feof(file)){int ch;while((ch=fgetc(file))!=EOF&&ch!='\n');invalid++;continue;}
+  char *a=strchr(line,'\t');if(!a){invalid++;continue;}*a++=0;
+  char *b=strchr(a,'\t');if(!b){invalid++;continue;}*b++=0;
+  char *end=strpbrk(b,"\r\n");if(end)*end=0;
+  unsigned game_id=0,save_id=0;
+  if(!line[0]||!a[0]||strlen(line)>=128||strlen(a)>=48||
+     !gfs_parse_save_page_ids(b,&game_id,&save_id)||save_id){invalid++;continue;}
+  gfs_save_t seed={0};
+  snprintf(seed.game,sizeof(seed.game),"%s",line);
+  snprintf(seed.region,sizeof(seed.region),"%s",a);
+  snprintf(seed.format,sizeof(seed.format),"PAGE");
+  snprintf(seed.description,sizeof(seed.description),"GameFAQs listing (unverified)");
+  snprintf(seed.page_url,sizeof(seed.page_url),"%s",b);
+  if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)<0){
+   fclose(file);return -3;
+  }
+  accepted++;
+ }
+ fclose(file);
+ if(accepted==0)return invalid?-4:0;
+ return accepted;
+}
 static void saves_load_index(){
  g_saves_count=0;FILE *f=fopen(g_saves_index_path,"rb");if(!f)return;
  if(fseek(f,0,SEEK_END)!=0){fclose(f);return;}long size=ftell(f);
@@ -5045,7 +5078,7 @@ static void draw_saves_catalogue(){
   text_centered_bounded(x+24,yy+1,w-48,rowh-2,label,idx==g_saves_selected?0xFFFFFFFFu:0xFFE1EBF2u,g_body_scale);
  }
  int fy=y+header+(visible?visible:1)*rowh+7;
- text_centered_bounded(x+18,fy,w-36,24,g_saves_count?"X OPEN / DOWNLOAD    O BACK":"GameFAQs index missing/empty - separate from Game DB",0xFF9EF2B0u,g_help_scale);
+ text_centered_bounded(x+18,fy,w-36,24,g_saves_count?"X OPEN / DOWNLOAD    O BACK":"GameFAQs index empty - SQUARE imports local seed listings",0xFF9EF2B0u,g_help_scale);
  text_centered_bounded(x+18,fy+25,w-36,24,g_saves_level==2?"SQUARE SCAN GAME SAVES  |  X OPEN REGION":g_saves_level==3?"SQUARE REFRESH SAVE LINKS  |  X DOWNLOAD":"Direct file links only; saves are never converted automatically",0xFFBBD1E0u,g_help_scale);
 }
 static void draw_homebrew_catalogue(){
@@ -5675,7 +5708,12 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
     }
    }else{
     saves_load_index();g_saves_level=0;g_saves_selected=g_saves_top=0;
-    snprintf(status_line,sizeof(status_line),"GameFAQs index reloaded: %d entries",g_saves_count);
+    if(!g_saves_count){
+     int imported=saves_import_seeds();
+     if(imported>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs: %d seed listings imported; select game then SQUARE to scan",imported);}
+     else if(imported==-2)snprintf(status_line,sizeof(status_line),"GameFAQs: add GAMEFAQS_SEEDS.tsv to USRDIR (game, region, listing URL)");
+     else snprintf(status_line,sizeof(status_line),"GameFAQs: seed import failed (%d)",imported);
+    }else snprintf(status_line,sizeof(status_line),"GameFAQs index reloaded: %d entries",g_saves_count);
    }
    g_ui_dirty=1;
   }
