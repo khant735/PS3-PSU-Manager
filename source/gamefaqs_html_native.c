@@ -42,7 +42,7 @@ int gfs_extract_detail_html(const char *html,const char *page_url,
    char tmp[512];const char *host="https://gamefaqs.gamespot.com";size_t hn=strlen(host);memcpy(tmp,host,hn);memcpy(tmp+hn,url,strlen(url)+1);copy(url,sizeof(url),tmp);
   }
   /* Entity-encoded href values require HTML decoding before use. */
-  if(strchr(url,38))continue;
+  if(strchr(url,38)||strpbrk(url,"\\\r\n\t "))continue;
   if(!gfs_download_allowed(url)||!format_for(url))continue;
   int duplicate=0;for(int i=0;i<count;i++)if(!strcmp(out[i].download_url,url))duplicate=1;
   if(duplicate)continue;
