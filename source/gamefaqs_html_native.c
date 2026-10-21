@@ -7,7 +7,7 @@
 static int prefix(const char *s,const char *p){return strncmp(s,p,strlen(p))==0;}
 static void copy(char *dst,size_t cap,const char *src){snprintf(dst,cap,"%s",src);}
 static const char *format_for(const char *url){
- const char *q=strchr(url,'?');size_t len=q?(size_t)(q-url):strlen(url);
+ const char *q=strpbrk(url,"?#");size_t len=q?(size_t)(q-url):strlen(url);
  static const struct {const char *ext,*fmt;} exts[]={
  {".psu","PSU"},{".max","MAX"},{".cbs","CBS"},{".xps","XPS"},
  {".sps","SPS"},{".xpo","XPO"},{".spo","SPO"},{".psv","PSV"},{".zip","ZIP"}};
