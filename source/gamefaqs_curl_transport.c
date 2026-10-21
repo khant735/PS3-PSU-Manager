@@ -22,7 +22,12 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  if(!html||!length)return 0;
  *html=NULL;*length=0;
  unsigned gid=0,sid=0;
- if(!url||!gfs_parse_save_page_ids(url,&gid,&sid))return 0;
+ int category=0;
+ if(url){const char *base="https://gamefaqs.gamespot.com/ps2/category/999-all?page=";
+  size_t n=strlen(base);if(!strncmp(url,base,n)&&url[n]&&strspn(url+n,"0123456789")==strlen(url+n)){
+   unsigned page=(unsigned)strtoul(url+n,NULL,10);category=page<=63;
+  }}
+ if(!url||(!category&&!gfs_parse_save_page_ids(url,&gid,&sid)))return 0;
  CURL *curl=curl_easy_init();if(!curl)return 0;
  struct gfs_buffer b={0};
  curl_easy_setopt(curl,CURLOPT_URL,url);
@@ -45,7 +50,11 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  long status=0;curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);
  char *effective=NULL;curl_easy_getinfo(curl,CURLINFO_EFFECTIVE_URL,&effective);
  unsigned final_game=0,final_save=0;
- int trusted=effective&&gfs_parse_save_page_ids(effective,&final_game,&final_save)&&final_game==gid&&final_save==sid;
+ int trusted=0;
+ if(category){const char *base="https://gamefaqs.gamespot.com/ps2/category/999-all?page=";
+  trusted=effective&&!strncmp(effective,base,strlen(base))&&
+   !strcmp(effective+strlen(base),url+strlen(base));
+ }else trusted=effective&&gfs_parse_save_page_ids(effective,&final_game,&final_save)&&final_game==gid&&final_save==sid;
  if(rc!=CURLE_OK||b.failed||status!=200||!trusted){
   fprintf(stderr,"GameFAQs fetch: curl=%d http=%ld overflow=%d trusted=%d url=%s\n",(int)rc,status,b.failed,trusted,url);
   curl_easy_cleanup(curl);
