@@ -66,9 +66,37 @@ Install the PKG through the supported package installer on a compatible CFW PS3.
 
 ## Screenshots
 
-**Genuine captures are pending.** The images under `assets/` are artwork and reference images, not evidence of the application running. Planned screenshots: file browser, archive details, animated icon preview, virtual keyboard, downloader progress, homebrew catalogue, GameFAQs Saves and Options.
+PS2 PSU Manager **v1.63** interface captures:
 
-Place verified screenshots in `docs/screenshots/` and link them here once captured from RPCS3 or real PS3 hardware.
+### File browser
+
+![HDD file browser showing save artwork and files](docs/screenshots/v1.63-file-browser.png)
+
+### X-Port icon preview
+
+![X-Port archive and PS2 icon preview](docs/screenshots/v1.63-xport-icon-preview.png)
+
+### SharkPort icon preview
+
+![SharkPort archive and PS2 icon preview](docs/screenshots/v1.63-sharkport-icon-preview.png)
+
+### Options menu
+
+![Options menu with FPS diagnostics](docs/screenshots/v1.63-options.png)
+
+### URL keyboard
+
+![File downloader URL entry keyboard](docs/screenshots/v1.63-url-keyboard.png)
+
+### Downloader progress
+
+![Multi-connection downloader diagnostics and pause/resume](docs/screenshots/v1.63-download-progress.png)
+
+### PS2Wiki catalogue
+
+![PS2Wiki PSU catalogue](docs/screenshots/v1.63-ps2wiki-catalogue.png)
+
+*Additional features, including GameFAQs Saves, can be documented when screenshots become available.*
 
 ## Known limitations
 
