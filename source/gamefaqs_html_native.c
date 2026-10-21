@@ -32,7 +32,12 @@ int gfs_extract_detail_html(const char *html,const char *page_url,
   size_t n=(size_t)(end-a);p=end+1;
   if(n==0||n>500)continue;
   char url[512];memcpy(url,a,n);url[n]=0;
-  if(prefix(url,"/")){
+  /* Protocol-relative links must retain HTTPS, not gain a duplicate host. */
+  if(prefix(url,"//")){
+   if(strlen(url)+strlen("https:")>=sizeof(url))continue;
+   char tmp[512];snprintf(tmp,sizeof(tmp),"https:%s",url);
+   copy(url,sizeof(url),tmp);
+  }else if(prefix(url,"/")){
    if(strlen(url)+strlen("https://gamefaqs.gamespot.com")>=sizeof(url))continue;
    char tmp[512];const char *host="https://gamefaqs.gamespot.com";size_t hn=strlen(host);memcpy(tmp,host,hn);memcpy(tmp+hn,url,strlen(url)+1);copy(url,sizeof(url),tmp);
   }
