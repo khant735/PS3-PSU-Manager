@@ -33,6 +33,8 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  /* Follow a bounded number of redirects; validate the final host below. */
  curl_easy_setopt(curl,CURLOPT_FOLLOWLOCATION,1L);
  curl_easy_setopt(curl,CURLOPT_MAXREDIRS,5L);
+ /* Never permit a redirect from HTTPS to HTTP or a non-web protocol. */
+ curl_easy_setopt(curl,CURLOPT_REDIR_PROTOCOLS,(long)CURLPROTO_HTTPS);
  curl_easy_setopt(curl,CURLOPT_FAILONERROR,0L);
  curl_easy_setopt(curl,CURLOPT_SSL_VERIFYPEER,1L);
  curl_easy_setopt(curl,CURLOPT_SSL_VERIFYHOST,2L);
@@ -47,7 +49,9 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  if(rc!=CURLE_OK||b.failed||status!=200||!trusted){
   fprintf(stderr,"GameFAQs fetch: curl=%d http=%ld overflow=%d trusted=%d url=%s\n",(int)rc,status,b.failed,trusted,url);
   curl_easy_cleanup(curl);
-  free(b.data);return (int)(status?status:0);
+  free(b.data);
+  /* Return a distinct negative error for TLS/network/redirect failures. */
+  return rc!=CURLE_OK?-(int)rc:(b.failed?-1001:(status!=200?(int)status:-1002));
  }
  curl_easy_cleanup(curl);
  if(!b.data){b.data=(char*)malloc(1);if(!b.data)return 0;b.data[0]=0;}
