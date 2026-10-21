@@ -66,33 +66,31 @@ Install the PKG through the supported package installer on a compatible CFW PS3.
 
 ## Screenshots
 
-PS2 PSU Manager **v1.63** interface captures:
-
-### File browser
+### File browser:
 
 ![HDD file browser showing save artwork and files](docs/screenshots/v1.63-file-browser.png)
 
-### X-Port icon preview
+### X-Port icon preview:
 
 ![X-Port archive and PS2 icon preview](docs/screenshots/v1.63-xport-icon-preview.png)
 
-### SharkPort icon preview
+### SharkPort icon preview:
 
 ![SharkPort archive and PS2 icon preview](docs/screenshots/v1.63-sharkport-icon-preview.png)
 
-### Options menu
+### Options menu:
 
 ![Options menu with FPS diagnostics](docs/screenshots/v1.63-options.png)
 
-### URL keyboard
+### URL keyboard:
 
 ![File downloader URL entry keyboard](docs/screenshots/v1.63-url-keyboard.png)
 
-### Downloader progress
+### Downloader progress:
 
 ![Multi-connection downloader diagnostics and pause/resume](docs/screenshots/v1.63-download-progress.png)
 
-### PS2Wiki catalogue
+### Homebrew Catalogue:
 
 ![PS2Wiki PSU catalogue](docs/screenshots/v1.63-ps2wiki-catalogue.png)
 
