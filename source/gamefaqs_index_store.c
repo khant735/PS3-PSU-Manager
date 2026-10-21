@@ -12,7 +12,9 @@ static int clean(const char *s,size_t cap){
 }
 static int valid(const gfs_save_t *e){
  unsigned game_id=0,save_id=0;
- if(!gfs_parse_save_page_ids(e->page_url,&game_id,&save_id)||!save_id)return 0;
+ if(!gfs_parse_save_page_ids(e->page_url,&game_id,&save_id))return 0;
+ /* PAGE records without a save ID represent listing seeds. */
+ if(!save_id&&(strcmp(e->format,"PAGE")||e->download_url[0]))return 0;
  return clean(e->game,sizeof(e->game))&&*e->game&&
  clean(e->region,sizeof(e->region))&&*e->region&&
  clean(e->format,sizeof(e->format))&&*e->format&&
