@@ -94,6 +94,8 @@ int gfs_parse_save_page_ids(const char *url, unsigned *game_id, unsigned *save_i
   }
  }
  if(*p&&*p!='?'&&*p!='#')return 0;
+ /* A trailing slash after /saves without a numeric save ID is invalid. */
+ if(p>url && p[-1]=='/' && save==0)return 0;
  *game_id=game;*save_id=save;
  return game!=0;
 }
