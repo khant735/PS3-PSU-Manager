@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #define GFS_HTML_LIMIT (1024U*1024U)
-#define GFS_DETAIL_LIMIT 32
+#define GFS_DETAIL_LIMIT 256
 static int read_page(const char *url,gfs_fetch_fn fetch,gfs_release_fn release,
  void *ctx,char **html,size_t *length){
  *html=NULL;*length=0;
