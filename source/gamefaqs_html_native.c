@@ -75,7 +75,8 @@ int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity){
   if(!n||n>=384)continue;
   char url[384];memcpy(url,a,n);url[n]=0;
   /* Accept canonical HTTPS protocol-relative GameFAQs page links. */
-  if(prefix(url,"//gamefaqs.gamespot.com/ps2/")){
+  if(prefix(url,"//gamefaqs.gamespot.com/ps2/")||
+     prefix(url,"//www.gamefaqs.com/ps2/")){
    char full[384];
    if(strlen(url)+strlen("https:")>=sizeof(full))continue;
    snprintf(full,sizeof(full),"https:%s",url);
