@@ -72,6 +72,13 @@ int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity){
   size_t n=(size_t)(end-a);p=end+1;
   if(!n||n>=384)continue;
   char url[384];memcpy(url,a,n);url[n]=0;
+  /* Accept canonical HTTPS protocol-relative GameFAQs page links. */
+  if(prefix(url,"//gamefaqs.gamespot.com/ps2/")){
+   char full[384];
+   if(strlen(url)+strlen("https:")>=sizeof(full))continue;
+   snprintf(full,sizeof(full),"https:%s",url);
+   copy(url,sizeof(url),full);
+  }
   if(prefix(url,"/ps2/")){
    char full[384];const char *host="https://gamefaqs.gamespot.com";
    if(strlen(host)+n>=sizeof(full))continue;
