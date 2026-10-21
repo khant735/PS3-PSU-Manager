@@ -25,7 +25,7 @@ int gfs_extract_detail_html(const char *html,const char *page_url,
  int count=0;const char *p=html;
  while((p=strstr(p,"href"))!=NULL){
   const char *a=p+4;while(*a==' '||*a=='\t')a++;
-  if(*a++!='='){p+=4;continue;}
+  if(*a!='='){p+=4;continue;}a++;
   while(*a==' '||*a=='\t')a++;
   char quote=*a;if(quote!='\''&&quote!='\"'){p+=4;continue;}a++;
   const char *end=strchr(a,quote);if(!end)break;
