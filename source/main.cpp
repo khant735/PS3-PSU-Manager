@@ -4980,6 +4980,33 @@ static int saves_fetch_detail_page(const char *page_url,const char *game,const c
  * A seed is a discovery target, not a verified downloadable save.
  * Only same-game detail links discovered from live HTML enter the index.
  */
+/* Built-in, independently located PS2 GameFAQs save listings.
+ * These are verified *page URLs*, NOT verified file downloads. This
+ * starter catalogue works on a fresh installation without a seed file.
+ * Future catalogue updates can extend it without erasing existing entries.
+ */
+static int saves_import_builtin_listings(){
+ static const struct {const char *game,*url;} listings[]={
+  {"ICO","https://gamefaqs.gamespot.com/ps2/367472-ico/saves"},
+  {"Sly Cooper and the Thievius Raccoonus","https://gamefaqs.gamespot.com/ps2/561378-sly-cooper-and-the-thievius-raccoonus/saves"},
+  {"The Lord of the Rings: The Return of the King","https://gamefaqs.gamespot.com/ps2/561989-the-lord-of-the-rings-the-return-of-the-king/saves"},
+  {"The Polar Express","https://gamefaqs.gamespot.com/ps2/920105-the-polar-express/saves"},
+  {"Primal","https://gamefaqs.gamespot.com/ps2/518049-primal/saves"},
+  {"Haunting Ground","https://gamefaqs.gamespot.com/ps2/924655-haunting-ground/saves"}
+ };
+ int imported=0;
+ for(unsigned i=0;i<sizeof(listings)/sizeof(listings[0]);i++){
+  gfs_save_t seed={0};
+  snprintf(seed.game,sizeof(seed.game),"%s",listings[i].game);
+  snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
+  snprintf(seed.format,sizeof(seed.format),"PAGE");
+  snprintf(seed.description,sizeof(seed.description),"GameFAQs listing (file links not verified)");
+  snprintf(seed.page_url,sizeof(seed.page_url),"%s",listings[i].url);
+  if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)<0)return -1;
+  imported++;
+ }
+ return imported;
+}
 static int saves_import_seeds(){
  const char *path="/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_SEEDS.tsv";
  FILE *file=fopen(path,"rb");if(!file)return -2;
@@ -5672,12 +5699,13 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
   if(press&B_CROSS){if(g_options_selected==0){g_fps_enabled=!g_fps_enabled;g_ui_dirty=1;}else if(g_options_selected==1){g_download_connections=(g_download_connections+1)%17;g_ui_dirty=1;}else if(g_options_selected==2){start_url_keyboard();draw();continue;}else if(g_options_selected==3){if(g_psu_catalogue_source==0){g_options_active=0;g_catalogue_active=1;g_catalogue_category=0;g_catalogue_selected=0;g_catalogue_top_index=0;g_ui_dirty=1;draw();catalogue_open_first_populated_category();draw();continue;}else if(g_psu_catalogue_source==2){g_options_active=0;g_saves_active=1;g_saves_level=0;g_saves_selected=g_saves_top=0;
     saves_load_index();
     if(!g_saves_count){
-     int imported=saves_import_seeds();
+     int imported=saves_import_builtin_listings();
+     if(imported>=0){int extra=saves_import_seeds();if(extra>0)imported+=extra;}
      if(imported>0){
       saves_load_index();
       snprintf(status_line,sizeof(status_line),"GameFAQs: %d seed listings imported; select game then SQUARE to scan",imported);
      }else if(imported==-2)
-      snprintf(status_line,sizeof(status_line),"GameFAQs index empty: GAMEFAQS_SEEDS.tsv not installed");
+      snprintf(status_line,sizeof(status_line),"GameFAQs: no catalogue listings available");
      else if(imported<0)
       snprintf(status_line,sizeof(status_line),"GameFAQs seed import failed (%d)",imported);
     }
@@ -5722,9 +5750,10 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
    }else{
     saves_load_index();g_saves_level=0;g_saves_selected=g_saves_top=0;
     if(!g_saves_count){
-     int imported=saves_import_seeds();
+     int imported=saves_import_builtin_listings();
+     if(imported>=0){int extra=saves_import_seeds();if(extra>0)imported+=extra;}
      if(imported>0){saves_load_index();snprintf(status_line,sizeof(status_line),"GameFAQs: %d seed listings imported; select game then SQUARE to scan",imported);}
-     else if(imported==-2)snprintf(status_line,sizeof(status_line),"GameFAQs: add GAMEFAQS_SEEDS.tsv to USRDIR (game, region, listing URL)");
+     else if(imported==-2)snprintf(status_line,sizeof(status_line),"GameFAQs: no catalogue listings available");
      else snprintf(status_line,sizeof(status_line),"GameFAQs: seed import failed (%d)",imported);
     }else snprintf(status_line,sizeof(status_line),"GameFAQs index reloaded: %d entries",g_saves_count);
    }
