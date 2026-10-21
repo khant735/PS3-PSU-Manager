@@ -74,7 +74,7 @@ Install the PKG through the supported package installer on a compatible CFW PS3.
 
 ![X-Port archive and PS2 icon preview](docs/screenshots/v1.63-xport-icon-preview.png)
 
-### SharkPort icon preview:
+### SharkPort / GameShark icon preview:
 
 ![SharkPort archive and PS2 icon preview](docs/screenshots/v1.63-sharkport-icon-preview.png)
 
