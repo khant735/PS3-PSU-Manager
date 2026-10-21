@@ -1,5 +1,6 @@
 #include "gamefaqs_curl_transport.h"
 #include "gamefaqs_crawl.h"
+#include "gamefaqs_index_store.h"
 #include "gamefaqs_discovery_pipeline.h"
 #include "ps2_game_titles.h"
 #include "ps2_game_db_update.h"
