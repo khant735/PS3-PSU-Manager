@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <errno.h>
 #include <string>
 #include <map>
 #include <vector>
@@ -113,7 +114,18 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
  if(fprintf(f,"%s\t%s\n",it->first.c_str(),name.c_str())<0){ok=false;break;}
  }
  if(fflush(f)!=0)ok=false;if(fclose(f)!=0)ok=false;
- if(!ok||rename(temp.c_str(),target)!=0){remove(temp.c_str());if(message&&cap)snprintf(message,cap,"Database write failed; previous DB preserved");return -1;}
+ if(!ok){
+  int err=errno;
+  remove(temp.c_str());
+  if(message&&cap)snprintf(message,cap,"DB write/flush failed (errno %d); previous DB preserved",err);
+  return -1;
+ }
+ if(rename(temp.c_str(),target)!=0){
+  int err=errno;
+  remove(temp.c_str());
+  if(message&&cap)snprintf(message,cap,"DB replace failed (errno %d); previous DB preserved",err);
+  return -1;
+ }
  /* Build a per-serial release index locally. Preserve existing enriched records
     so a routine GameDB refresh cannot erase verified release metadata. */
  std::string releases=std::string(target);
