@@ -48,12 +48,17 @@ int gfs_crawl_listing(const char *listing_url,const char *index_path,
  }
  /* An HTTP 200 response is not proof that the saves listing was parsed. */
  if(!discovered){free(urls);return -2;}
+ /* Keep the discovered PAGE entries even when some individual detail pages
+  * cannot be fetched. Their download URLs remain empty until verified. */
  int processed=1;
  for(int i=0;i<found;i++){
   unsigned detail_game=0,detail_id=0;
   if(!gfs_parse_save_page_ids(urls[i],&detail_game,&detail_id)||
      detail_game!=gid||!detail_id)continue;
-  if(read_page(urls[i],fetch,release,ctx,&html,&length))continue;
+  if(read_page(urls[i],fetch,release,ctx,&html,&length)){
+   fprintf(stderr,"GameFAQs detail unavailable: %s\n",urls[i]);
+   continue;
+  }
   result=gfs_ingest_html(index_path,html,urls[i],game,region,maximum_entries);
   release(html,ctx);
   if(result>=0)processed++;
