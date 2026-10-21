@@ -61,7 +61,8 @@ int gfs_crawl_listing(const char *listing_url,const char *index_path,
   }
   result=gfs_ingest_html(index_path,html,urls[i],game,region,maximum_entries);
   release(html,ctx);
-  if(result>=0)processed++;
+  if(result<0)fprintf(stderr,"GameFAQs detail index merge failed: %s\n",urls[i]);
+  else processed++;
  }
  free(urls);
  return processed;
