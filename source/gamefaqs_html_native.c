@@ -30,7 +30,7 @@ int gfs_extract_detail_html(const char *html,const char *page_url,
   char quote=*a;if(quote!='\''&&quote!='\"'){p+=4;continue;}a++;
   const char *end=strchr(a,quote);if(!end)break;
   size_t n=(size_t)(end-a);p=end+1;
-  if(n==0||n>500)continue;
+  if(n==0||n>=512)continue;
   char url[512];memcpy(url,a,n);url[n]=0;
   /* Protocol-relative links must retain HTTPS, not gain a duplicate host. */
   if(prefix(url,"//")){
@@ -88,7 +88,7 @@ int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity){
    copy(url,sizeof(url),full);
   }
   /* Do not misindex HTML entity-encoded links as raw URLs. */
-  if(strchr(url,38))continue;
+  if(strchr(url,38)||strpbrk(url,"\\\r\n\t "))continue;
   unsigned game_id=0,save_id=0;
   if(!gfs_parse_save_page_ids(url,&game_id,&save_id)||!save_id)continue;
   /* A /saves listing link is not an individual save entry. */
