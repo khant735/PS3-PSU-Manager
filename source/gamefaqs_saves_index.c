@@ -28,6 +28,10 @@ int gfs_bucket(const char *s){
  if(c>='a'&&c<='z')c-=32;
  return c>='A'&&c<='Z'?c-'A'+1:0;
 }
+static int detail_page(const char *url){
+ unsigned game_id=0,save_id=0;
+ return gfs_parse_save_page_ids(url,&game_id,&save_id)&&save_id!=0;
+}
 int gfs_parse_index(const char *data,gfs_save_t *out,int cap){
  if(!data||!out||cap<=0)return -1;
  int count=0;
@@ -41,7 +45,7 @@ int gfs_parse_index(const char *data,gfs_save_t *out,int cap){
    char *parts[6],*p=buf;int fields=0;
    parts[fields++]=p;
    while(*p){if(*p=='\t'){*p=0;if(fields>=6){fields=7;break;}parts[fields++]=p+1;}p++;}
-   if(fields==6&&parts[0][0]&&parts[1][0]&&parts[2][0]&&gfs_parse_save_page_ids(parts[4],&(unsigned){0},&(unsigned){0})&&(!parts[5][0]||gfs_download_allowed(parts[5]))&&(strcmp(parts[2],"PAGE")||!parts[5][0])){
+   if(fields==6&&parts[0][0]&&parts[1][0]&&parts[2][0]&&detail_page(parts[4])&&(!parts[5][0]||gfs_download_allowed(parts[5]))&&(strcmp(parts[2],"PAGE")||!parts[5][0])){
     if(strlen(parts[0])<128&&strlen(parts[1])<48&&strlen(parts[2])<24&&strlen(parts[3])<192&&strlen(parts[4])<384&&strlen(parts[5])<512){
      if(count>=cap)break;
      gfs_save_t *e=&out[count++];memset(e,0,sizeof(*e));
