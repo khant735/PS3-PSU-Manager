@@ -16,7 +16,7 @@ static int safe_url(const char *url){
 }
 int gfs_download_allowed(const char *url){
  if(!safe_url(url))return 0;
- const char *end=strchr(url,'?');
+ const char *end=strpbrk(url,"?#");
  size_t n=end?(size_t)(end-url):strlen(url);
  const char *exts[]={".psu",".max",".cbs",".xps",".sps",".xpo",".spo",".zip",".psv"};
  for(unsigned i=0;i<sizeof(exts)/sizeof(exts[0]);i++){size_t z=strlen(exts[i]);if(n>=z&&!strncasecmp(url+n-z,exts[i],z))return 1;}
