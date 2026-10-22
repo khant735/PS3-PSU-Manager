@@ -41,6 +41,30 @@ jobs:
           done
           echo 'ERROR: PSL1GHT ppu_rules missing from builder image' >&2
           exit 1
+      - name: Prepare complete offline PS2 title database
+        run: |
+          set -eu
+          python3 - <<'PY'
+          import json, re, urllib.request
+          from pathlib import Path
+          url='https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.titles.json'
+          request=urllib.request.Request(url,headers={'User-Agent':'PS3-PSU-Manager-CI/1.63'})
+          with urllib.request.urlopen(request,timeout=90) as response:
+              payload=response.read(16*1024*1024+1)
+          assert len(payload)<=16*1024*1024, 'GameDB source too large'
+          data=json.loads(payload)
+          assert isinstance(data,dict), 'Unexpected GameDB schema'
+          titles={key.upper():value for key,value in data.items()
+                  if isinstance(key,str) and re.fullmatch(r'[A-Za-z]{4}-[0-9]{5}',key)
+                  and isinstance(value,str) and value.strip() and len(value)<512}
+          assert len(titles)>=12000, f'Incomplete upstream database: {len(titles)} titles'
+          def clean(s):return s.replace('\\t',' ').replace('\\r',' ').replace('\\n',' ')
+          Path('PS2_GAME_TITLES.tsv').write_text(''.join(f'{key}\\t{clean(title)}\\n' for key,title in sorted(titles.items())),encoding='utf-8')
+          Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv').write_text(
+              '# serial\\ttitle\\tregion\\tedition\\trevision\\trelease_date\\tdate_precision\\tsource\\n'+
+              ''.join(f'{key}\\t{clean(title)}\\t\\t\\t\\t\\tunknown\\tGameDB\\n' for key,title in sorted(titles.items())),encoding='utf-8')
+          print(f'Bundling {len(titles)} offline PS2 titles and release-index rows')
+          PY
       - name: Compile ELF and generate SELF / PKG
         run: |
           set -eux
