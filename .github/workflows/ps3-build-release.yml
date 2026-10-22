@@ -63,7 +63,24 @@ jobs:
           Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv').write_text(
               '# serial\\ttitle\\tregion\\tedition\\trevision\\trelease_date\\tdate_precision\\tsource\\n'+
               ''.join(f'{key}\\t{clean(title)}\\t\\t\\t\\t\\tunknown\\tGameDB\\n' for key,title in sorted(titles.items())),encoding='utf-8')
-          print(f'Bundling {len(titles)} offline PS2 titles and release-index rows')
+          # Preserve explicitly sourced regional release dates in the offline snapshot.
+          # Never assign a game's first release date to all regional disc serials.
+          releases=Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv')
+          lines=releases.read_text(encoding='utf-8').splitlines()
+          verified={
+              'SCES-50294':('Europe','2001-07-20','day','https://www.gran-turismo.com/gb/products/gt3/'),
+          }
+          for i,line in enumerate(lines):
+              columns=line.split('\\t')
+              if len(columns)!=8 or columns[0] not in verified:continue
+              region,date,precision,source=verified[columns[0]]
+              columns[2]=region
+              columns[5]=date
+              columns[6]=precision
+              columns[7]=source
+              lines[i]='\\t'.join(columns)
+          releases.write_text('\\n'.join(lines)+'\\n',encoding='utf-8')
+          print(f'Bundling {len(titles)} offline PS2 titles and release-index rows; {len(verified)} sourced regional dates')
           PY
       - name: Compile ELF and generate SELF / PKG
         run: |
