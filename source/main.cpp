@@ -3334,7 +3334,20 @@ static void draw_psu_metadata_modal(){
    else if(!strncmp(candidate_serial,"SLPS-",5)||!strncmp(candidate_serial,"SLPM-",5)||!strncmp(candidate_serial,"SCPS-",5))region_hint="Japan (serial prefix; not disc-verified)";
   }
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Region: %s",region_hint);yy+=lh;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Regional release date: Not available");yy+=lh;
+  char release_date[24]={0},release_precision[16]={0},release_source[96]={0};
+  int release_found=0;
+  if(candidate && matched){
+   const char *release_paths[]={
+    "/dev_hdd0/game/PSU000001/USRDIR/PS2_GAME_TITLES.releases.tsv",
+    "/dev_hdd0/tmp/fakeusb/PS2/SAVEDATA/PS2_GAME_TITLES.releases.tsv",NULL};
+   for(int di=0;release_paths[di];di++){
+    if(ps2_game_release_lookup(release_paths[di],candidate_serial,
+       release_date,sizeof(release_date),release_precision,sizeof(release_precision),
+       release_source,sizeof(release_source))==1){release_found=1;break;}
+   }
+  }
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Regional release date: %s",release_found?release_date:"Not available");yy+=lh;
+  if(release_found){textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Date precision: %s  Source: %s",release_precision,release_source);yy+=lh;}
   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Serial inferred from folder ID; not verified against game disc.");yy+=lh;
   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Read-only details. No extraction or conversion performed.");
  }else if(sharkport_details_active() && g_psu_metadata_page==4+g_psu_meta_cache.entry_count){
