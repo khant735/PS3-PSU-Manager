@@ -39,10 +39,13 @@ $(BUILD):
 clean:
 	rm -rf $(BUILD) $(OUTPUT).elf $(OUTPUT).self $(OUTPUT).pkg
 pkg: $(BUILD)
+	@mkdir -p $(PKGFILES)/USRDIR
+	@cp PS2_GAME_TITLES.tsv $(PKGFILES)/USRDIR/PS2_GAME_TITLES.tsv
 	@$(MAKE) --no-print-directory -W $(OUTPUT).self $(OUTPUT).pkg
 	@test -f $(BUILDDIR)/pkg/PARAM.HIP || (echo "ERROR: PARAM.HIP missing from package staging"; exit 1)
 	@grep -q "PS2 .PSU SAVE MANAGER v1.63T" $(BUILDDIR)/pkg/PARAM.HIP || (echo "ERROR: PARAM.HIP version text mismatch"; exit 1)
 	@test -s $(BUILDDIR)/pkg/USRDIR/cacert.pem || (echo "ERROR: CA bundle missing from package staging"; exit 1)
+	@cmp -s PS2_GAME_TITLES.tsv $(BUILDDIR)/pkg/USRDIR/PS2_GAME_TITLES.tsv || (echo "ERROR: bundled PS2 title database missing or mismatched"; exit 1)
 run: $(BUILD)
 	ps3load $(OUTPUT).self
 host-test:
