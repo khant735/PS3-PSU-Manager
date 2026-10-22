@@ -3,6 +3,7 @@
 #include <curl/curl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <stdint.h>
 #include <stdio.h>
 #define GFS_MAX_HTML (1024U*1024U)
@@ -17,6 +18,60 @@ static size_t gfs_write(char *p,size_t size,size_t count,void *user){
  b->data=next;memcpy(b->data+b->used,p,n);
  b->used+=n;b->data[b->used]=0;return n;
 }
+
+/* GameFAQs-only diagnostics. No cookies, credentials or response bodies. */
+#define GFS_LOG_PATH "/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_HTTP.LOG"
+#define GFS_LOG_OLD  "/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_HTTP.OLD"
+struct gfs_headers {char server[96],ray[96],mitigated[96],type[96];};
+static void gfs_header_value(char *dst,size_t cap,const char *p,size_t n){
+ while(n&&(*p==' '||*p=='\\t')){p++;n--;}
+ while(n&&(p[n-1]=='\\r'||p[n-1]=='\\n'||p[n-1]==' '))n--;
+ if(n>=cap)n=cap-1;
+ memcpy(dst,p,n);dst[n]=0;
+}
+static size_t gfs_header(char *ptr,size_t size,size_t count,void *ctx){
+ struct gfs_headers *h=(struct gfs_headers*)ctx;
+ if(size&&count>SIZE_MAX/size)return 0;
+ size_t n=size*count;
+ /* Clear on every HTTP response line, including redirect responses. */
+ if(n>=5&&!memcmp(ptr,"HTTP/",5))memset(h,0,sizeof(*h));
+ else {
+  struct {const char *key;char *dst;size_t cap;} keys[]={
+   {"server:",h->server,sizeof(h->server)},
+   {"cf-ray:",h->ray,sizeof(h->ray)},
+   {"cf-mitigated:",h->mitigated,sizeof(h->mitigated)},
+   {"content-type:",h->type,sizeof(h->type)}
+  };
+  for(size_t i=0;i<sizeof(keys)/sizeof(keys[0]);i++){
+   size_t k=strlen(keys[i].key);
+   if(n>=k&&!strncasecmp(ptr,keys[i].key,k)){
+    gfs_header_value(keys[i].dst,keys[i].cap,ptr+k,n-k);break;
+   }
+  }
+ }
+ return n;
+}
+static void gfs_log_http(const char *url,long status,int rc,int trusted,
+ long version,size_t bytes,const struct gfs_headers *h){
+ FILE *fp=fopen(GFS_LOG_PATH,"ab");
+ if(!fp)return;
+ if(fseek(fp,0,SEEK_END)==0){
+  long size=ftell(fp);
+  if(size>256L*1024L){
+   fclose(fp);
+   remove(GFS_LOG_OLD);
+   rename(GFS_LOG_PATH,GFS_LOG_OLD);
+   fp=fopen(GFS_LOG_PATH,"ab");if(!fp)return;
+  }
+ }
+ fprintf(fp,"GameFAQs HTTP: url=%s status=%ld curl=%d trusted=%d http_version=%ld bytes=%lu\\n",
+  url,status,rc,trusted,version,(unsigned long)bytes);
+ fprintf(fp,"server=%s cf-ray=%s cf-mitigated=%s content-type=%s\\n---\\n",
+  h->server[0]?h->server:"(absent)",h->ray[0]?h->ray:"(absent)",
+  h->mitigated[0]?h->mitigated:"(absent)",h->type[0]?h->type:"(absent)");
+ fclose(fp);
+}
+
 int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  (void)ctx;
  if(!html||!length)return 0;
@@ -46,6 +101,9 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  if(!url||(!category&&!game_page&&!gfs_parse_save_page_ids(url,&gid,&sid)))return 0;
  CURL *curl=curl_easy_init();if(!curl)return 0;
  struct gfs_buffer b={0};
+ struct gfs_headers headers={0};
+ curl_easy_setopt(curl,CURLOPT_HEADERFUNCTION,gfs_header);
+ curl_easy_setopt(curl,CURLOPT_HEADERDATA,&headers);
  curl_easy_setopt(curl,CURLOPT_URL,url);
  curl_easy_setopt(curl,CURLOPT_WRITEFUNCTION,gfs_write);
  curl_easy_setopt(curl,CURLOPT_WRITEDATA,&b);
@@ -69,10 +127,13 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  CURLcode rc=curl_easy_perform(curl);
  long status=0;curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);
  char *effective=NULL;curl_easy_getinfo(curl,CURLINFO_EFFECTIVE_URL,&effective);
+ long http_version=0;
+ curl_easy_getinfo(curl,CURLINFO_HTTP_VERSION,&http_version);
  unsigned final_game=0,final_save=0;
  int trusted=0;
  if(category||game_page)trusted=effective&&!strcmp(effective,url);
  else trusted=effective&&gfs_parse_save_page_ids(effective,&final_game,&final_save)&&final_game==gid&&final_save==sid;
+ gfs_log_http(url,status,(int)rc,trusted,http_version,b.used,&headers);
  if(rc!=CURLE_OK||b.failed||status!=200||!trusted){
   fprintf(stderr,"GameFAQs fetch [Chrome-UA trial]: curl=%d http=%ld overflow=%d trusted=%d url=%s\n",(int)rc,status,b.failed,trusted,url);
   curl_easy_cleanup(curl);
