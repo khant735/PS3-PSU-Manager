@@ -3264,7 +3264,8 @@ static int sharkport_details_active(){return g_foreign_archive_view &&
 static int psu_metadata_page_count(){if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 5+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
 static void sjis_title_slice_ascii(const unsigned char*src,size_t begin,size_t end,char*out,size_t cap){if(begin>end){size_t t=begin;begin=end;end=t;}if(end>68)end=68;ps2_sjis_title_ascii(src+begin,end-begin,out,cap);}
 static void draw_psu_metadata_modal(){
- int x=g_margin+20,y=g_title_y+55,w=(int)g_width-g_margin*2-40,h=(int)g_height-y-g_margin-35;round_rect(x,y,w,h,10,0xF20A1622u);rect(x+3,y+3,w-6,3,0xFF2CCBFFu);
+ int x=g_margin+20,y=g_title_y+55,w=(int)g_width-g_margin*2-40,h=(int)g_height-y-g_margin-35;/* Opaque details surface: never blend browser rows, preview or HUD through text. */
+ round_rect(x,y,w,h,10,0xFF0A1622u);rect(x+3,y+3,w-6,3,0xFF2CCBFFu);
  textf(x+18,y+14,0xFFFFFFFFu,g_title_scale,"PSU DETAILS   PAGE %d/%d",g_psu_metadata_page+1,psu_metadata_page_count());int yy=y+55,lh=scale125(10*g_body_scale)+10;
  if(!g_psu_meta_cache.valid)psu_metadata_cache_load(); psu_entry_t root=g_psu_meta_cache.root;int rr=g_psu_meta_cache.root_ok?0:-1;size_t vs=g_psu_meta_cache.icon_sys_size;unsigned char*ic=g_psu_meta_cache.icon_sys;
  if(g_psu_metadata_page==0){
