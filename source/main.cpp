@@ -3313,10 +3313,28 @@ static void draw_psu_metadata_modal(){
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save type: %s",g_foreign_archive_view?"Imported PS2 save archive":"PSU archive");yy+=lh;
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Source file: %s",base_name(archive_path));yy+=lh;
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save folder ID: %s",rr?"Not available":root.name);yy+=lh;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Game / disc serial: Not verified");yy+=lh;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Region: Not verified");yy+=lh;
+  char candidate_serial[11]={0},db_title[512]={0};
+  int candidate=(!rr && ps2_game_extract_serial(root.name,candidate_serial));
+  int matched=0;
+  if(candidate){
+   const char *db_paths[]={
+    "/dev_hdd0/game/PSU000001/USRDIR/PS2_GAME_TITLES.tsv",
+    "/dev_hdd0/tmp/fakeusb/PS2/SAVEDATA/PS2_GAME_TITLES.tsv",NULL};
+   for(int di=0;db_paths[di];di++){
+    if(ps2_game_title_lookup(db_paths[di],root.name,db_title,sizeof(db_title))==1){matched=1;break;}
+   }
+  }
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Game / disc serial: %s",candidate?candidate_serial:"Not available");yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Database game match: %s",matched?db_title:"Not verified");yy+=lh;
+  const char *region_hint="Not verified";
+  if(matched){
+   if(!strncmp(candidate_serial,"SCES-",5)||!strncmp(candidate_serial,"SLES-",5))region_hint="Europe (serial prefix; not disc-verified)";
+   else if(!strncmp(candidate_serial,"SLUS-",5)||!strncmp(candidate_serial,"SCUS-",5))region_hint="North America (serial prefix; not disc-verified)";
+   else if(!strncmp(candidate_serial,"SLPS-",5)||!strncmp(candidate_serial,"SLPM-",5)||!strncmp(candidate_serial,"SCPS-",5))region_hint="Japan (serial prefix; not disc-verified)";
+  }
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Region: %s",region_hint);yy+=lh;
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Regional release date: Not available");yy+=lh;
-  textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Save folder ID is not necessarily the game disc serial.");yy+=lh;
+  textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Serial inferred from folder ID; not verified against game disc.");yy+=lh;
   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Read-only details. No extraction or conversion performed.");
  }else if(sharkport_details_active() && g_psu_metadata_page==4+g_psu_meta_cache.entry_count){
   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SHARKPORT / X-PORT ICON COMPATIBILITY");yy+=lh+4;
