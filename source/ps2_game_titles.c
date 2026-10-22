@@ -39,3 +39,40 @@ int ps2_game_title_lookup(const char *database_path, const char *save_directory,
     }
     fclose(f);return 0;
 }
+
+/* Only report dates explicitly supplied with provenance; never infer them from
+   the game title, serial prefix, or a release year of another region. */
+int ps2_game_release_lookup(const char *database_path,const char *serial,
+                            char *date_out,size_t date_cap,
+                            char *precision_out,size_t precision_cap,
+                            char *source_out,size_t source_cap){
+    char line[2048];
+    if(!database_path||!serial||!date_out||!precision_out||!source_out||
+       !date_cap||!precision_cap||!source_cap)return -2;
+    date_out[0]=precision_out[0]=source_out[0]=0;
+    FILE *f=fopen(database_path,"rb");
+    if(!f)return -1;
+    while(fgets(line,sizeof(line),f)){
+        char *field[8]={0};int count=0;
+        if(line[0]=='#')continue;
+        field[count++]=line;
+        for(char *p=line;*p&&count<8;p++)if(*p=='\\t'){*p=0;field[count++]=p+1;}
+        if(count!=8||strcmp(field[0],serial))continue;
+        char *date=field[5],*precision=field[6],*source=field[7];
+        source[strcspn(source,"\\r\\n")]=0;
+        if(!date[0]||!source[0]||!strcmp(precision,"unknown"))continue;
+        size_t n=strlen(date);
+        if(n!=4&&n!=7&&n!=10)continue;
+        int valid=1;
+        for(size_t i=0;i<n;i++)if((i==4||(i==7&&n==10))?
+            date[i]!='-':!isdigit((unsigned char)date[i]))valid=0;
+        if(!valid||((n==4)&&strcmp(precision,"year"))||
+           ((n==7)&&strcmp(precision,"month"))||
+           ((n==10)&&strcmp(precision,"day")))continue;
+        if(strlen(date)>=date_cap||strlen(precision)>=precision_cap||
+           strlen(source)>=source_cap)continue;
+        strcpy(date_out,date);strcpy(precision_out,precision);strcpy(source_out,source);
+        fclose(f);return 1;
+    }
+    fclose(f);return 0;
+}
