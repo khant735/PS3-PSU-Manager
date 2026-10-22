@@ -5001,55 +5001,85 @@ static volatile int g_saves_scan_result=0;
 static gfs_save_t g_saves_scan_entry;
 /* Refresh the PS2 category catalogue in the background. Only explicit Saves
  * links are imported; game slugs are used as fallback display labels. */
+/* Follow only explicit GameFAQs links. Category pages contain game links,
+ * which in turn contain /saves links. No guessed game IDs or save URLs. */
 static int saves_import_category_pages(){
- int imported=0,successful=0;
- for(int page=0;page<64;page++){
-  char url[128];snprintf(url,sizeof(url),"https://gamefaqs.gamespot.com/ps2/category/999-all?page=%d",page);
-  char *html=NULL;size_t length=0;
-  int http_status=gfs_curl_fetch(url,&html,&length,NULL);
-   if(http_status==403 || http_status==401 || http_status==429){
+ const char *host="https://gamefaqs.gamespot.com";
+ char category[64][384]={{0}},games[512][384]={{0}};
+ int cat_count=1,game_count=0,successful=0,imported=0;
+ snprintf(category[0],sizeof(category[0]),"%s/ps2/category/999-all",host);
+ /* Two bounded passes: discover catalogue pagination/games, then Saves tabs. */
+ for(int pass=0;pass<2;pass++){
+  int count=pass?game_count:cat_count;
+  for(int i=0;i<count;i++){
+   const char *url=pass?games[i]:category[i];
+   char *html=NULL;size_t length=0;
+   int status=gfs_curl_fetch(url,&html,&length,NULL);
+   if(status==401||status==403||status==429){
     gfs_curl_release(html,NULL);
-    /* Respect access denial and rate limits; do not request further pages. */
-    return -4;
+    return -4; /* Do not continue requesting pages after denial. */
    }
-   if(http_status!=200){gfs_curl_release(html,NULL);continue;}
-  successful++;
-  const char *p=html;
-  while((p=strstr(p,"href"))!=NULL){
-   const char *a=p+4;while(*a==' '||*a==9)a++;
-   if(*a++!='='){p+=4;continue;}
-   while(*a==' '||*a==9)a++;
-   char quote=*a++;
-   if(quote!=39&&quote!=34){p+=4;continue;}
-   const char *end=strchr(a,quote);if(!end)break;
-   size_t n=(size_t)(end-a);p=end+1;
-   if(n<15||n>=384)continue;
-   char link[384];memcpy(link,a,n);link[n]=0;
-   if(!strncmp(link,"/ps2/",5)){
-    char absolute[384];snprintf(absolute,sizeof(absolute),"https://gamefaqs.gamespot.com%s",link);
-    snprintf(link,sizeof(link),"%s",absolute);
-   }else if(!strncmp(link,"//gamefaqs.gamespot.com/",25)){
-    char absolute[384];snprintf(absolute,sizeof(absolute),"https:%s",link);
-    snprintf(link,sizeof(link),"%s",absolute);
+   if(status!=200||!html){gfs_curl_release(html,NULL);continue;}
+   successful++;
+   const char *p=html;
+   while((p=strstr(p,"href"))!=NULL){
+    const char *a=p+4;while(*a==' '||*a==9)a++;
+    if(*a!='='){p+=4;continue;}a++;
+    while(*a==' '||*a==9)a++;
+    char quote=*a;if(quote!=39&&quote!=34){p+=4;continue;}a++;
+    const char *end=strchr(a,quote);if(!end)break;
+    size_t n=(size_t)(end-a);p=end+1;
+    if(n<5||n>=300)continue;
+    char link[384]={0};
+    if(!strncmp(a,"/ps2/",5))snprintf(link,sizeof(link),"%s%.*s",host,(int)n,a);
+    else if(n>25&&!strncmp(a,"https://gamefaqs.gamespot.com/ps2/",34))
+     snprintf(link,sizeof(link),"%.*s",(int)n,a);
+    else continue;
+    /* Do not follow encoded/query/fragment/external navigation targets. */
+    if(strchr(link,'&')||strchr(link,'#')||strchr(link,'\\')||
+       strpbrk(link,"\\r\\n\\t "))continue;
+    const char *path=link+strlen(host);
+    if(!pass&&!strncmp(path,"/ps2/category/999-all",21)){
+     const char *q=path+21;
+     if(*q&&strncmp(q,"?page=",6))continue;
+     if(*q){
+      q+=6;if(!*q)continue;
+      const char *d=q;while(*d>='0'&&*d<='9')d++;
+      if(*d)continue;
+     }
+     int seen=0;for(int j=0;j<cat_count;j++)if(!strcmp(category[j],link))seen=1;
+     if(!seen&&cat_count<64)snprintf(category[cat_count++],384,"%s",link);
+     continue;
+    }
+    if(strncmp(path,"/ps2/",5))continue;
+    const char *digits=path+5;
+    if(*digits<'0'||*digits>'9')continue;
+    while(*digits>='0'&&*digits<='9')digits++;
+    if(*digits!='-')continue;
+    const char *slug=digits+1;const char *tail=strchr(slug,'/');
+    if(!tail||tail==slug) {
+     if(pass)continue;
+     int seen=0;for(int j=0;j<game_count;j++)if(!strcmp(games[j],link))seen=1;
+     if(!seen&&game_count<512)snprintf(games[game_count++],384,"%s",link);
+     continue;
+    }
+    if(strcmp(tail,"/saves"))continue;
+    unsigned gid=0,sid=0;
+    if(!gfs_parse_save_page_ids(link,&gid,&sid)||sid)continue;
+    char title[128];size_t t=(size_t)(tail-slug);
+    if(!t||t>=sizeof(title))continue;
+    memcpy(title,slug,t);title[t]=0;
+    for(size_t j=0;j<t;j++)if(title[j]=='-')title[j]=' ';
+    gfs_save_t seed={0};
+    snprintf(seed.game,sizeof(seed.game),"%s",title);
+    snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
+    snprintf(seed.format,sizeof(seed.format),"PAGE");
+    snprintf(seed.description,sizeof(seed.description),"GameFAQs Saves listing (unverified)");
+    snprintf(seed.page_url,sizeof(seed.page_url),"%s",link);
+    if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
    }
-   unsigned gid=0,sid=0;
-   if(!gfs_parse_save_page_ids(link,&gid,&sid)||sid)continue;
-   char *query=strpbrk(link,"?#");if(query)*query=0;
-   char *slug=strstr(link,"/ps2/");if(!slug)continue;
-   slug=strchr(slug+5,'-');if(!slug)continue;slug++;
-   char *stop=strstr(slug,"/saves");if(!stop)continue;
-   char title[128];size_t t=(size_t)(stop-slug);if(!t||t>=sizeof(title))continue;
-   memcpy(title,slug,t);title[t]=0;
-   for(size_t j=0;j<t;j++)if(title[j]=='-')title[j]=' ';
-   gfs_save_t seed={0};
-   snprintf(seed.game,sizeof(seed.game),"%s",title);
-   snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
-   snprintf(seed.format,sizeof(seed.format),"PAGE");
-   snprintf(seed.description,sizeof(seed.description),"GameFAQs catalogue listing (unverified)");
-   snprintf(seed.page_url,sizeof(seed.page_url),"%s",link);
-   if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
+   gfs_curl_release(html,NULL);
   }
-  gfs_curl_release(html,NULL);
  }
  return successful?imported:-3;
 }
