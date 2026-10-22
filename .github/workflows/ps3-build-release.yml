@@ -107,6 +107,32 @@ jobs:
               ''.join('\t'.join(row)+'\n' for row in records),encoding='utf-8')
           print(f'Bundling {len(titles)} titles and {dated} sourced release dates')
           PY
+      - name: Merge reviewed supplemental PS2 release dates when present
+        run: |
+          set -eu
+          if [ -f data/ps2_release_candidates.tsv ]; then
+            python3 tools/merge_ps2_release_dates.py \
+              pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv \
+              data/ps2_release_candidates.tsv \
+              --output /tmp/PS2_GAME_TITLES.releases.merged.tsv \
+              --review /tmp/PS2_GAME_TITLES.releases.review.tsv
+            cp /tmp/PS2_GAME_TITLES.releases.merged.tsv pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv
+            python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          path=Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv')
+          rows=[line.split('\\t') for line in path.read_text(encoding='utf-8').splitlines() if line and not line.startswith('#')]
+          assert len(rows)>=12000 and all(len(row)==8 for row in rows), 'Malformed enriched release database'
+          dated=sum(bool(row[5]) for row in rows)
+          assert dated>=100, 'Enriched database unexpectedly sparse'
+          print(f'Final release database: {len(rows)} serials, {dated} dated')
+          with Path('/tmp/PS2_GAME_TITLES.releases.review.tsv').open(encoding='utf-8',newline='') as stream:
+              review=list(csv.DictReader(stream,delimiter='\\t'))
+          print(f'Supplemental candidates requiring review: {len(review)}')
+          PY
+          else
+            echo 'No curated supplemental dates supplied; using GameDB-PS2 baseline'
+          fi
       - name: Compile ELF and generate SELF / PKG
         run: |
           set -eux
