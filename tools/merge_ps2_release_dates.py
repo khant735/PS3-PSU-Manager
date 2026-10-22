@@ -52,13 +52,23 @@ def main():
     rejected = []
     inserted = 0
     with args.candidates.open(encoding="utf-8", newline="") as handle:
-        for item in csv.DictReader(handle, delimiter="\t"):
+        candidates = list(csv.DictReader(handle, delimiter="\t"))
+    versions = {}
+    for item in candidates:
+        key = (item.get("serial") or "").strip().upper()
+        value = ((item.get("release_date") or "").strip(),
+                 (item.get("region") or "").strip().casefold())
+        versions.setdefault(key, set()).add(value)
+    ambiguous = {key for key, values in versions.items() if len(values) > 1}
+    for item in candidates:
             serial = (item.get("serial") or "").strip().upper()
             date = (item.get("release_date") or "").strip()
             region = (item.get("region") or "").strip()
             url = (item.get("source_url") or "").strip()
             reason = None
-            if not SERIAL.fullmatch(serial) or serial not in positions:
+            if serial in ambiguous:
+                reason = "conflicting candidates for serial"
+            elif not SERIAL.fullmatch(serial) or serial not in positions:
                 reason = "unknown serial"
             elif not precision(date):
                 reason = "invalid date"
