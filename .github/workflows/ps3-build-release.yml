@@ -41,6 +41,10 @@ jobs:
           done
           echo 'ERROR: PSL1GHT ppu_rules missing from builder image' >&2
           exit 1
+      - name: Run PS2 release-date merge regression tests
+        run: |
+          set -eu
+          python3 tests/test_release_date_merge.py
       - name: Prepare complete offline PS2 title database
         run: |
           set -eu
