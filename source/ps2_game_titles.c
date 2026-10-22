@@ -56,7 +56,7 @@ int ps2_game_release_lookup(const char *database_path,const char *serial,
         char *field[8]={0};int count=0;
         if(line[0]=='#')continue;
         field[count++]=line;
-        for(char *p=line;*p&&count<8;p++)if(*p=='\\t'){*p=0;field[count++]=p+1;}
+        for(char *p=line;*p&&count<8;p++)if(*p=='\t'){*p=0;field[count++]=p+1;}
         if(count!=8||strcmp(field[0],serial))continue;
         char *date=field[5],*precision=field[6],*source=field[7];
         source[strcspn(source,"\\r\\n")]=0;
