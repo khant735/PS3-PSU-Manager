@@ -13,25 +13,35 @@
  * Keep the previous DB in .bak until the new file has been installed.
  * Never overwrite a stranded backup: it may be the only recoverable copy.
  */
+/* On PS3, rename() may reject an existing destination. Preserve the old
+ * database as .bak until installation completes. Distinguish successful
+ * fallback from a direct rename for runtime diagnostics.
+ */
+static int last_replace_mode=0; /* 1=direct, 2=backup fallback, 0=failed */
+static int last_replace_errno=0;
 static int replace_preserving_old(const std::string &temp,const std::string &target){
+ last_replace_mode=0;last_replace_errno=0;
  errno=0;
- if(rename(temp.c_str(),target.c_str())==0)return 0;
- if(errno!=EEXIST)return -1;
+ if(rename(temp.c_str(),target.c_str())==0){last_replace_mode=1;return 0;}
+ int direct_error=errno;
+ if(direct_error!=EEXIST){last_replace_errno=direct_error;errno=direct_error;return -1;}
  std::string backup=target+".bak";
  FILE *check=fopen(backup.c_str(),"rb");
- if(check){fclose(check);errno=EEXIST;return -1;}
- if(rename(target.c_str(),backup.c_str())!=0)return -1;
+ if(check){fclose(check);last_replace_errno=EEXIST;errno=EEXIST;return -1;}
+ if(rename(target.c_str(),backup.c_str())!=0){last_replace_errno=errno;return -1;}
  if(rename(temp.c_str(),target.c_str())==0){
-  /* A failed cleanup leaves a harmless backup, never delete the new DB. */
+  last_replace_mode=2;
+  /* Never discard a working newly installed DB on cleanup failure. */
   remove(backup.c_str());
   return 0;
  }
  int install_error=errno;
  if(rename(backup.c_str(),target.c_str())!=0){
-  /* Leave both the staged new file and the old .bak for manual recovery. */
+  last_replace_errno=EIO;
   errno=EIO;
-  return -2;
+  return -2; /* retain both .bak and .part for recovery */
  }
+ last_replace_errno=install_error;
  errno=install_error;
  return -1;
 }
@@ -147,6 +157,7 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
   return -1;
  }
  int replacement=replace_preserving_old(temp,std::string(target));
+ int titles_replace_mode=last_replace_mode;
  if(replacement!=0){
   int err=errno;
   if(replacement!=-2)remove(temp.c_str());
@@ -205,8 +216,8 @@ extern "C" int ps2_game_db_update(const char *target,char *message,size_t cap){
   else if(errno!=EIO)remove(release_tmp.c_str());
  }
  if(message&&cap){
-  if(release_written)snprintf(message,cap,"%lu titles (%lu GameDB); release index updated",(unsigned long)titles.size(),(unsigned long)primary);
-  else snprintf(message,cap,"%lu titles updated; release index write failed (old index preserved)",(unsigned long)titles.size());
+  if(release_written)snprintf(message,cap,"%lu titles (%lu GameDB); titles %s; releases %s",(unsigned long)titles.size(),(unsigned long)primary,titles_replace_mode==2?"backup fallback":"direct install",last_replace_mode==2?"backup fallback":"direct install");
+  else snprintf(message,cap,"%lu titles updated (%s); release index write failed (errno %d; old index preserved)",(unsigned long)titles.size(),titles_replace_mode==2?"backup fallback":"direct install",last_replace_errno);
  }
  return (int)titles.size();
 }
