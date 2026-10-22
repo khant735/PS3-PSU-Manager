@@ -46,6 +46,8 @@ pkg: $(BUILD)
 	@grep -q "PS2 .PSU SAVE MANAGER v1.63T" $(BUILDDIR)/pkg/PARAM.HIP || (echo "ERROR: PARAM.HIP version text mismatch"; exit 1)
 	@test -s $(BUILDDIR)/pkg/USRDIR/cacert.pem || (echo "ERROR: CA bundle missing from package staging"; exit 1)
 	@cmp -s PS2_GAME_TITLES.tsv $(BUILDDIR)/pkg/USRDIR/PS2_GAME_TITLES.tsv || (echo "ERROR: bundled PS2 title database missing or mismatched"; exit 1)
+	@test -s $(PKGFILES)/USRDIR/PS2_GAME_TITLES.releases.tsv || (echo "ERROR: PS2 release-date database missing from package inputs"; exit 1)
+	@cmp -s $(PKGFILES)/USRDIR/PS2_GAME_TITLES.releases.tsv $(BUILDDIR)/pkg/USRDIR/PS2_GAME_TITLES.releases.tsv || (echo "ERROR: PS2 release-date database missing or mismatched in package"; exit 1)
 run: $(BUILD)
 	ps3load $(OUTPUT).self
 host-test:
