@@ -5005,7 +5005,11 @@ static gfs_save_t g_saves_scan_entry;
  * which in turn contain /saves links. No guessed game IDs or save URLs. */
 static int saves_import_category_pages(){
  const char *host="https://gamefaqs.gamespot.com";
- char category[64][384]={{0}},games[512][384]={{0}};
+ /* Worker threads have small stacks: keep ~216 KiB of URL storage off-stack.
+  * Only the single catalogue worker calls this function. */
+ static char category[64][384],games[512][384];
+ memset(category,0,sizeof(category));
+ memset(games,0,sizeof(games));
  int cat_count=1,game_count=0,successful=0,imported=0;
  snprintf(category[0],sizeof(category[0]),"%s/ps2/category/999-all",host);
  /* Two bounded passes: discover catalogue pagination/games, then Saves tabs. */
