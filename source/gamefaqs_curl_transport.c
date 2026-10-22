@@ -45,7 +45,11 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  curl_easy_setopt(curl,CURLOPT_SSL_VERIFYHOST,2L);
  curl_easy_setopt(curl,CURLOPT_SSLVERSION,CURL_SSLVERSION_TLSv1_2);
  curl_easy_setopt(curl,CURLOPT_CAINFO,"/dev_hdd0/game/PSU000001/USRDIR/cacert.pem");
- curl_easy_setopt(curl,CURLOPT_USERAGENT,"PS3-PSU-Manager/1.63T Save-Index");
+ /* Diagnostic A/B test: present a desktop Chrome User-Agent for GameFAQs
+  * only. This changes no TLS fingerprint or browser challenge handling. */
+ curl_easy_setopt(curl,CURLOPT_USERAGENT,
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+  "(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36");
  CURLcode rc=curl_easy_perform(curl);
  long status=0;curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&status);
  char *effective=NULL;curl_easy_getinfo(curl,CURLINFO_EFFECTIVE_URL,&effective);
@@ -56,7 +60,7 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
    !strcmp(effective+strlen(base),url+strlen(base));
  }else trusted=effective&&gfs_parse_save_page_ids(effective,&final_game,&final_save)&&final_game==gid&&final_save==sid;
  if(rc!=CURLE_OK||b.failed||status!=200||!trusted){
-  fprintf(stderr,"GameFAQs fetch: curl=%d http=%ld overflow=%d trusted=%d url=%s\n",(int)rc,status,b.failed,trusted,url);
+  fprintf(stderr,"GameFAQs fetch [Chrome-UA trial]: curl=%d http=%ld overflow=%d trusted=%d url=%s\n",(int)rc,status,b.failed,trusted,url);
   curl_easy_cleanup(curl);
   free(b.data);
   /* Return a distinct negative error for TLS/network/redirect failures. */
