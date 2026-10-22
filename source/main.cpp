@@ -5006,7 +5006,13 @@ static int saves_import_category_pages(){
  for(int page=0;page<64;page++){
   char url[128];snprintf(url,sizeof(url),"https://gamefaqs.gamespot.com/ps2/category/999-all?page=%d",page);
   char *html=NULL;size_t length=0;
-  if(gfs_curl_fetch(url,&html,&length,NULL)!=200)continue;
+  int http_status=gfs_curl_fetch(url,&html,&length,NULL);
+   if(http_status==403 || http_status==401 || http_status==429){
+    gfs_curl_release(html,NULL);
+    /* Respect access denial and rate limits; do not request further pages. */
+    return -4;
+   }
+   if(http_status!=200){gfs_curl_release(html,NULL);continue;}
   successful++;
   const char *p=html;
   while((p=strstr(p,"href"))!=NULL){
