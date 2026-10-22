@@ -53,6 +53,44 @@ def extract(page,source,game='',region='Unspecified'):
   rows.append('\t'.join(re.sub(r'[\t\r\n]+',' ',v) for v in vals))
  return {'game_id':gameid,'save_id':saveid,'game':title,'detail_pages':details,'download_rows':rows}
 
+
+def extract_listing_entries(page, source):
+ """Read GameFAQs listing entries without mistaking save-detail URLs for files.
+
+ Returns metadata only: save_id, URL, region/format heading, uploader,
+ upload date, size and description. A listing entry is NOT a direct download.
+ """
+ if not trusted(page) or not PAT.fullmatch(urlparse(page).path):
+  raise ValueError('Expected trusted PS2 GameFAQs saves URL')
+ entries=[];seen=set();heading=''
+ # The listing is grouped by <div class="head"><h2 class="title"> and
+ # <li> elements; limit scanning to each group rather than whole-page links.
+ group_pattern=re.compile(r'<div\\s+class=["\\\']head["\\\'][^>]*>.*?<h2\\s+class=["\\\']title["\\\'][^>]*>(.*?)</h2>(.*?)(?=<div\\s+class=["\\\']head["\\\']|$)',re.I|re.S)
+ for group in group_pattern.finditer(source):
+  heading=html.unescape(re.sub(r'<[^>]*>','',group.group(1))).strip()
+  for li in re.finditer(r'<li(?:\\s[^>]*)?>(.*?)</li>',group.group(2),re.I|re.S):
+   block=li.group(1)
+   anchor=re.search(r'<a\\s+[^>]*href=["\\\']([^"\\\']+)["\\\'][^>]*>',block,re.I|re.S)
+   if not anchor:continue
+   url=urljoin(page,html.unescape(anchor.group(1)))
+   if not trusted(url):continue
+   m=PAT.fullmatch(urlparse(url).path)
+   base=PAT.fullmatch(urlparse(page).path)
+   if not m or m.group(1)!=base.group(1) or not m.group(3) or m.group(3) in seen:continue
+   seen.add(m.group(3))
+   bold=re.search(r'<div\\s+class=["\\\']bold["\\\'][^>]*>(.*?)</div>',block,re.I|re.S)
+   meta=re.search(r'<div\\s+class=["\\\']meta["\\\'][^>]*>(.*?)</div>',block,re.I|re.S)
+   def clean(v):return ' '.join(html.unescape(re.sub(r'<[^>]*>','',v or '')).split())
+   byline=clean(bold.group(1)) if bold else ''
+   details=re.search(r'\\((\\d{2}/\\d{2}/\\d{4});\\s*([^)]*)\\)',byline)
+   entries.append({'save_id':m.group(3),'url':url,'category':heading,
+    'uploader':byline.split(' (')[0].removeprefix('From ').strip(),
+    'date':details.group(1) if details else '',
+    'size':details.group(2) if details else '',
+    'description':clean(meta.group(1)) if meta else '',
+    'download_verified':False})
+ return entries
+
 def main():
  ap=argparse.ArgumentParser(description=__doc__)
  ap.add_argument('html',type=Path);ap.add_argument('--page-url',required=True)
