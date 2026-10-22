@@ -60,27 +60,52 @@ jobs:
           assert len(titles)>=12000, f'Incomplete upstream database: {len(titles)} titles'
           def clean(s):return s.replace('\\t',' ').replace('\\r',' ').replace('\\n',' ')
           Path('PS2_GAME_TITLES.tsv').write_text(''.join(f'{key}\\t{clean(title)}\\n' for key,title in sorted(titles.items())),encoding='utf-8')
+          # GameDB complete JSON has per-serial {title,region,release_date} metadata.
+          # The titles-only file contains no release dates.
+          full_url='https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.data.json'
+          full_req=urllib.request.Request(full_url,headers={'User-Agent':'PS3-PSU-Manager-CI/1.63'})
+          with urllib.request.urlopen(full_req,timeout=90) as response:
+              full_payload=response.read(16*1024*1024+1)
+          assert len(full_payload)<=16*1024*1024,'GameDB metadata too large'
+          complete=json.loads(full_payload)
+          assert isinstance(complete,dict) and len(complete)>=12000,'Incomplete GameDB metadata'
+          def single(value):
+              if isinstance(value,list):return value[0].strip() if len(value)==1 and isinstance(value[0],str) else ''
+              return value.strip() if isinstance(value,str) else ''
+          def valid_date(value):
+              if re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):
+                  import datetime
+                  try:datetime.date.fromisoformat(value);return 'day'
+                  except ValueError:return ''
+              if re.fullmatch(r'\d{4}-\d{2}',value):
+                  return 'month' if 1<=int(value[5:7])<=12 else ''
+              if re.fullmatch(r'\d{4}',value):return 'year'
+              return ''
+          source='https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.data.json'
+          records=[]
+          dated=0
+          for serial,title in sorted(titles.items()):
+              meta=complete.get(serial,{})
+              if not isinstance(meta,dict):meta={}
+              region=single(meta.get('region',''))
+              date=single(meta.get('release_date',''))
+              precision=valid_date(date)
+              if not precision:date=''
+              if any(c in region for c in '\t\r\n'):region=''
+              if precision:dated+=1
+              records.append([serial,clean(title),clean(region),'','',date,
+                              precision if precision else 'unknown',source if precision else 'GameDB'])
+          # Sony confirms the regional date of the specific European disc.
+          for record in records:
+              if record[0]=='SCES-50294' and not record[5]:
+                  record[2]='PAL';record[5]='2001-07-20';record[6]='day'
+                  record[7]='https://www.gran-turismo.com/gb/products/gt3/'
+                  dated+=1
+          assert dated>100, f'Unexpectedly sparse GameDB release dates: {dated}'
           Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv').write_text(
-              '# serial\\ttitle\\tregion\\tedition\\trevision\\trelease_date\\tdate_precision\\tsource\\n'+
-              ''.join(f'{key}\\t{clean(title)}\\t\\t\\t\\t\\tunknown\\tGameDB\\n' for key,title in sorted(titles.items())),encoding='utf-8')
-          # Preserve explicitly sourced regional release dates in the offline snapshot.
-          # Never assign a game's first release date to all regional disc serials.
-          releases=Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv')
-          lines=releases.read_text(encoding='utf-8').splitlines()
-          verified={
-              'SCES-50294':('Europe','2001-07-20','day','https://www.gran-turismo.com/gb/products/gt3/'),
-          }
-          for i,line in enumerate(lines):
-              columns=line.split('\\t')
-              if len(columns)!=8 or columns[0] not in verified:continue
-              region,date,precision,source=verified[columns[0]]
-              columns[2]=region
-              columns[5]=date
-              columns[6]=precision
-              columns[7]=source
-              lines[i]='\\t'.join(columns)
-          releases.write_text('\\n'.join(lines)+'\\n',encoding='utf-8')
-          print(f'Bundling {len(titles)} offline PS2 titles and release-index rows; {len(verified)} sourced regional dates')
+              '# serial\ttitle\tregion\tedition\trevision\trelease_date\tdate_precision\tsource\n'+
+              ''.join('\t'.join(row)+'\n' for row in records),encoding='utf-8')
+          print(f'Bundling {len(titles)} titles and {dated} sourced release dates')
           PY
       - name: Compile ELF and generate SELF / PKG
         run: |
