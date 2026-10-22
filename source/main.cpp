@@ -3329,9 +3329,9 @@ static void draw_psu_metadata_modal(){
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Database game match: %s",matched?db_title:"Not verified");yy+=lh;
   const char *region_hint="Not verified";
   if(matched){
-   if(!strncmp(candidate_serial,"SCES-",5)||!strncmp(candidate_serial,"SLES-",5))region_hint="Europe (serial prefix; not disc-verified)";
-   else if(!strncmp(candidate_serial,"SLUS-",5)||!strncmp(candidate_serial,"SCUS-",5))region_hint="North America (serial prefix; not disc-verified)";
-   else if(!strncmp(candidate_serial,"SLPS-",5)||!strncmp(candidate_serial,"SLPM-",5)||!strncmp(candidate_serial,"SCPS-",5))region_hint="Japan (serial prefix; not disc-verified)";
+   if(!strncmp(candidate_serial,"SCES-",5)||!strncmp(candidate_serial,"SLES-",5))region_hint="Europe (inferred)";
+   else if(!strncmp(candidate_serial,"SLUS-",5)||!strncmp(candidate_serial,"SCUS-",5))region_hint="North America (inferred)";
+   else if(!strncmp(candidate_serial,"SLPS-",5)||!strncmp(candidate_serial,"SLPM-",5)||!strncmp(candidate_serial,"SCPS-",5))region_hint="Japan (inferred)";
   }
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Region: %s",region_hint);yy+=lh;
   char release_date[24]={0},release_precision[16]={0},release_source[96]={0};
@@ -3347,8 +3347,17 @@ static void draw_psu_metadata_modal(){
    }
   }
   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Regional release date: %s",release_found?release_date:"Not available");yy+=lh;
-  if(release_found){textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Date precision: %s  Source: %s",release_precision,release_source);yy+=lh;}
-  textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Serial inferred from folder ID; not verified against game disc.");yy+=lh;
+  if(release_found){
+    const char *source_label=release_source;
+    if(strstr(release_source,"niemasd/GameDB-PS2"))source_label="GameDB-PS2";
+    else if(strstr(release_source,"gran-turismo.com"))source_label="Gran Turismo official";
+    else if(strstr(release_source,"wiki.pcsx2.net"))source_label="PCSX2 Wiki";
+    else if(strstr(release_source,"psxdatacenter.com"))source_label="PSX DataCenter";
+    else if(strstr(release_source,"github.com/"))source_label="GitHub source";
+    else if(strstr(release_source,"://"))source_label="External source";
+    textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Date precision: %s  Source: %s",release_precision,source_label);yy+=lh;
+   }
+  textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Disc serial inferred from save folder; not independently verified.");yy+=lh;
   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Read-only details. No extraction or conversion performed.");
  }else if(sharkport_details_active() && g_psu_metadata_page==4+g_psu_meta_cache.entry_count){
   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SHARKPORT / X-PORT ICON COMPATIBILITY");yy+=lh+4;
