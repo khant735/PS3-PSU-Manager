@@ -5065,9 +5065,10 @@ static int saves_import_category_pages(){
       if(t>=sizeof(game_title))t=sizeof(game_title)-1;
       memcpy(game_title,slug,t);game_title[t]=0;
       for(size_t k=0;k<t;k++)if(game_title[k]=='-')game_title[k]=' ';
-      int crawled=gfs_crawl_listing_https(url,g_saves_index_path,
-          game_title,"Multiple / unverified",GFS_MAX_ENTRIES);
-      if(diag){fprintf(diag,"detail crawl game=%u result=%d index=%s url=%s\\n",
+      int crawled=gfs_crawl_listing_html(url,html,g_saves_index_path,
+          game_title,"Multiple / unverified",GFS_MAX_ENTRIES,
+          gfs_curl_fetch,gfs_curl_release,NULL);
+      if(diag){fprintf(diag,"detail crawl game=%u result=%d index=%s url=%s\n",
           gid,crawled,g_saves_index_path,url);fflush(diag);}
       if(crawled>0)imported+=crawled-1;
      }
