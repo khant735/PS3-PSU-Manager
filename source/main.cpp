@@ -5011,21 +5011,46 @@ static int saves_import_category_pages(){
  memset(category,0,sizeof(category));
  memset(games,0,sizeof(games));
  int cat_count=1,game_count=0,successful=0,imported=0;
+ const char *cursor_path="/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_CURSOR.TXT";
+ int cursor=0;FILE *cf=fopen(cursor_path,"rb");if(cf){if(fscanf(cf,"%d",&cursor)!=1)cursor=0;fclose(cf);}
+ if(cursor<0)cursor=0;
  FILE *diag=fopen("/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_PARSE.LOG","ab");
  snprintf(category[0],sizeof(category[0]),"%s/ps2/category/999-all",host);
  /* Two bounded passes: discover catalogue pagination/games, then Saves tabs. */
  for(int pass=0;pass<2;pass++){
   int count=pass?game_count:cat_count;
-  for(int i=0;i<count;i++){
-   const char *url=pass?games[i]:category[i];
+  if(pass&&cursor>=count)cursor=0;
+  int first=pass?cursor:0;
+  int last=pass&&first+12<count?first+12:count;
+  for(int i=first;i<last;i++){
+   char saves_url[384];
+   if(pass)snprintf(saves_url,sizeof(saves_url),"%s/saves",games[i]);
+   const char *url=pass?saves_url:category[i];
    char *html=NULL;size_t length=0;
    int status=gfs_curl_fetch(url,&html,&length,NULL);
    if(status==401||status==403||status==429){
     gfs_curl_release(html,NULL);
     return -4; /* Do not continue requesting pages after denial. */
    }
-   if(status!=200||!html){gfs_curl_release(html,NULL);continue;}
+   if(status!=200||!html){gfs_curl_release(html,NULL);if(pass)break;continue;}
    successful++;
+   if(pass){
+    unsigned gid=0,sid=0;
+    if(gfs_parse_save_page_ids(url,&gid,&sid)&&gid&&!sid){
+     const char *slug=strchr(games[i]+strlen(host)+5,'-');
+     if(slug){
+      slug++;gfs_save_t seed={0};size_t t=strlen(slug);
+      if(t>=sizeof(seed.game))t=sizeof(seed.game)-1;
+      memcpy(seed.game,slug,t);seed.game[t]=0;
+      for(size_t k=0;k<t;k++)if(seed.game[k]=='-')seed.game[k]=' ';
+      snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
+      snprintf(seed.format,sizeof(seed.format),"PAGE");
+      snprintf(seed.description,sizeof(seed.description),"GameFAQs Saves listing (unverified)");
+      snprintf(seed.page_url,sizeof(seed.page_url),"%s",url);
+      if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
+     }
+    }
+   }
    int href_count=0,normalized_count=0;
    const char *p=html;
    while((p=strstr(p,"href"))!=NULL){
@@ -5104,6 +5129,7 @@ static int saves_import_category_pages(){
    }
    if(diag){fprintf(diag,"pass=%d url=%s bytes=%lu href=%d normalized=%d categories=%d games=%d imported=%d\n",pass,url,(unsigned long)length,href_count,normalized_count,cat_count,game_count,imported);fflush(diag);}
    gfs_curl_release(html,NULL);
+   if(pass){FILE *next=fopen(cursor_path,"wb");if(next){fprintf(next,"%d\n",i+1);fclose(next);}}
   }
  }
  if(diag){fprintf(diag,"FINAL successful=%d categories=%d games=%d imported=%d\n",successful,cat_count,game_count,imported);fclose(diag);}
