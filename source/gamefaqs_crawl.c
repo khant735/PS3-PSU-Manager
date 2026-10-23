@@ -29,49 +29,40 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
  int found=gfs_discover_save_links(html,urls,GFS_DETAIL_LIMIT);
  if(found<0){free(urls);return -1;}
  fprintf(stderr,"GameFAQs listing links: discovered=%d url=%s\n",found,listing_url);
- int result=0;
- int discovered=0;
- for(int i=0;i<found;i++){
-  unsigned dg=0,ds=0;
-  if(!gfs_parse_save_page_ids(urls[i],&dg,&ds)||dg!=gid||!ds)continue;
-  gfs_save_t page={0};
-  snprintf(page.game,sizeof(page.game),"%s",game);
-  snprintf(page.region,sizeof(page.region),"%s",region);
-  snprintf(page.format,sizeof(page.format),"PAGE");
-  snprintf(page.description,sizeof(page.description),"GameFAQs save %u",ds);
-  snprintf(page.page_url,sizeof(page.page_url),"%s",urls[i]);
-  result=gfs_merge_index_file(index_path,&page,1,maximum_entries);
-  if(result<0){free(urls);return -1;}
-  discovered++;
- }
- /* An HTTP 200 response is not proof that the saves listing was parsed. */
- if(!discovered){
-  /* A valid HTTP response may contain no individual save links. This is
-   * not an index write failure; retain all previously indexed records. */
-  fprintf(stderr,"GameFAQs listing has no recognized save-detail links: %s (href matches=%d)\n",listing_url,found);
-  free(urls);
-  return 0;
- }
- /* Keep the discovered PAGE entries even when some individual detail pages
-  * cannot be fetched. Their download URLs remain empty until verified. */
- int processed=1;
+ int matched=0, fetched=0, verified=0, failed=0;
  size_t length=0;
  for(int i=0;i<found;i++){
   unsigned detail_game=0,detail_id=0;
   if(!gfs_parse_save_page_ids(urls[i],&detail_game,&detail_id)||
      detail_game!=gid||!detail_id)continue;
+  matched++;
   char *detail_html=NULL;
   if(read_page(urls[i],fetch,release,ctx,&detail_html,&length)){
-   fprintf(stderr,"GameFAQs detail unavailable: %s\n",urls[i]);
+   fprintf(stderr,"GameFAQs detail unavailable: %s\\n",urls[i]);
+   failed++;
    continue;
   }
-  result=gfs_ingest_html(index_path,detail_html,urls[i],game,region,maximum_entries);
+  fetched++;
+  /* Never add PAGE placeholders: only validated direct download URLs
+   * returned by the detail parser are eligible for the catalogue. */
+  gfs_save_t records[64];
+  memset(records,0,sizeof(records));
+  int n=gfs_extract_detail_html(detail_html,urls[i],game,region,records,64);
   release(detail_html,ctx);
-  if(result<0)fprintf(stderr,"GameFAQs detail index merge failed: %s\n",urls[i]);
-  else processed++;
+  if(n<0){failed++;continue;}
+  if(!n)continue;
+  int merged=gfs_merge_index_file(index_path,records,n,maximum_entries);
+  if(merged<0){
+   fprintf(stderr,"GameFAQs detail merge failed: %s\\n",urls[i]);
+   failed++;
+  }else verified+=n;
  }
+ fprintf(stderr,"GameFAQs detail summary: matched=%d fetched=%d verified_urls=%d failed=%d listing=%s\\n",
+         matched,fetched,verified,failed,listing_url);
+ if(!matched)fprintf(stderr,"GameFAQs no recognized individual save links: %s\\n",listing_url);
+
  free(urls);
- return processed;
+ return verified;
 }
 
 int gfs_crawl_listing(const char *listing_url,const char *index_path,
