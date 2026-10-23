@@ -134,6 +134,51 @@ int gfs_curl_fetch(const char *url,char **html,size_t *length,void *ctx){
  if(category||game_page)trusted=effective&&!strcmp(effective,url);
  else trusted=effective&&gfs_parse_save_page_ids(effective,&final_game,&final_save)&&final_game==gid&&final_save==sid;
  gfs_log_http(url,status,(int)rc,trusted,http_version,b.used,&headers);
+ /* CachedView's actual View Cached Page button opens
+  * https://web.archive.org/web/2/<original-url>.  Use the same
+  * public Wayback lookup only when live GameFAQs is denied.
+  * Never treat archived save links as verified downloads. */
+ if(rc==CURLE_OK&&!b.failed&&status==403&&
+    !strcasecmp(headers.mitigated,"challenge")){
+  size_t n=strlen(url);
+  const char *archive_prefix="https://web.archive.org/web/2/";
+  char *archive_url=(char*)malloc(strlen(archive_prefix)+n+1);
+  if(archive_url){
+   sprintf(archive_url,"%s%s",archive_prefix,url);
+   free(b.data);b.data=NULL;b.used=0;b.failed=0;
+   memset(&headers,0,sizeof(headers));
+   curl_easy_setopt(curl,CURLOPT_URL,archive_url);
+   CURLcode archive_rc=curl_easy_perform(curl);
+   long archive_status=0;
+   curl_easy_getinfo(curl,CURLINFO_RESPONSE_CODE,&archive_status);
+   char *archive_effective=NULL;
+   curl_easy_getinfo(curl,CURLINFO_EFFECTIVE_URL,&archive_effective);
+   long archive_version=0;
+   curl_easy_getinfo(curl,CURLINFO_HTTP_VERSION,&archive_version);
+   /* Only accept HTTPS Wayback replay pages for this exact original
+    * GameFAQs URL; reject external redirects and unrelated content. */
+   const char *wayback="https://web.archive.org/web/";
+   int archive_trusted=0;
+   if(archive_effective&&!strncmp(archive_effective,wayback,strlen(wayback))){
+    const char *replay=strstr(archive_effective+strlen(wayback),"/https://gamefaqs.gamespot.com/");
+    if(replay&&!strcmp(replay+1,url))archive_trusted=1;
+   }
+   gfs_log_http(archive_url,archive_status,(int)archive_rc,
+                archive_trusted,archive_version,b.used,&headers);
+   if(archive_rc==CURLE_OK&&!b.failed&&archive_status==200&&archive_trusted){
+    fprintf(stderr,"GameFAQs: archived snapshot loaded via CachedView Wayback lookup: %s\\n",archive_effective);
+    curl_easy_cleanup(curl);
+    free(archive_url);
+    if(!b.data){b.data=(char*)malloc(1);if(!b.data)return 0;b.data[0]=0;}
+    *html=b.data;*length=b.used;return 200;
+   }
+   fprintf(stderr,"GameFAQs Wayback lookup failed: curl=%d http=%ld trusted=%d\\n",
+           (int)archive_rc,archive_status,archive_trusted);
+   free(archive_url);
+   rc=archive_rc;status=archive_status;trusted=archive_trusted;
+  }
+ }
+
  if(rc!=CURLE_OK||b.failed||status!=200||!trusted){
   fprintf(stderr,"GameFAQs fetch [Chrome-UA trial]: curl=%d http=%ld overflow=%d trusted=%d url=%s\n",(int)rc,status,b.failed,trusted,url);
   curl_easy_cleanup(curl);
