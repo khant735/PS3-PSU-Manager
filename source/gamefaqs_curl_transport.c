@@ -24,8 +24,8 @@ static size_t gfs_write(char *p,size_t size,size_t count,void *user){
 #define GFS_LOG_OLD  "/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_HTTP.OLD"
 struct gfs_headers {char server[96],ray[96],mitigated[96],type[96];};
 static void gfs_header_value(char *dst,size_t cap,const char *p,size_t n){
- while(n&&(*p==' '||*p=='\\t')){p++;n--;}
- while(n&&(p[n-1]=='\\r'||p[n-1]=='\\n'||p[n-1]==' '))n--;
+ while(n&&(*p==' '||*p=='\t')){p++;n--;}
+ while(n&&(p[n-1]=='\r'||p[n-1]=='\n'||p[n-1]==' '))n--;
  if(n>=cap)n=cap-1;
  memcpy(dst,p,n);dst[n]=0;
 }
@@ -64,9 +64,9 @@ static void gfs_log_http(const char *url,long status,int rc,int trusted,
    fp=fopen(GFS_LOG_PATH,"ab");if(!fp)return;
   }
  }
- fprintf(fp,"GameFAQs HTTP: url=%s status=%ld curl=%d trusted=%d http_version=%ld bytes=%lu\\n",
+ fprintf(fp,"GameFAQs HTTP: url=%s status=%ld curl=%d trusted=%d http_version=%ld bytes=%lu\n",
   url,status,rc,trusted,version,(unsigned long)bytes);
- fprintf(fp,"server=%s cf-ray=%s cf-mitigated=%s content-type=%s\\n---\\n",
+ fprintf(fp,"server=%s cf-ray=%s cf-mitigated=%s content-type=%s\n---\n",
   h->server[0]?h->server:"(absent)",h->ray[0]?h->ray:"(absent)",
   h->mitigated[0]?h->mitigated:"(absent)",h->type[0]?h->type:"(absent)");
  fclose(fp);
