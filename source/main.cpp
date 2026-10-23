@@ -5038,7 +5038,23 @@ static int saves_import_category_pages(){
     if(!strncmp(a,"/ps2/",5))snprintf(link,sizeof(link),"%s%.*s",host,(int)n,a);
     else if(n>25&&!strncmp(a,"https://gamefaqs.gamespot.com/ps2/",34))
      snprintf(link,sizeof(link),"%.*s",(int)n,a);
-    else continue;
+    else {
+     /* Wayback rewrites hrefs to /web/<timestamp>/https://original.
+      * Restore canonical GameFAQs URLs before applying the existing
+      * category -> game -> saves hierarchy and deduplication rules. */
+     char raw[384]={0};
+     snprintf(raw,sizeof(raw),"%.*s",(int)n,a);
+     const char *w=raw;
+     if(!strncmp(w,"https://web.archive.org",23))w+=23;
+     if(strncmp(w,"/web/",5))continue;
+     w+=5;
+     while(*w>='0'&&*w<='9')w++;
+     while((*w>='a'&&*w<='z')||(*w>='A'&&*w<='Z')||*w=='_')w++;
+     if(*w!='/')continue;
+     w++;
+     if(strncmp(w,"https://gamefaqs.gamespot.com/ps2/",34))continue;
+     snprintf(link,sizeof(link),"%s",w);
+    }
     /* Do not follow encoded/query/fragment/external navigation targets. */
     if(strchr(link,'&')||strchr(link,'#')||strchr(link,'\\')||
        strpbrk(link,"\\r\\n\\t "))continue;
