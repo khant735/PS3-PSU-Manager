@@ -44,8 +44,7 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
      fseek(f,0,SEEK_SET)!=0){fclose(f);free(tmp);return -1;}
  }else if(errno!=ENOENT){free(tmp);return -1;}
  char *data=(char*)malloc((size_t)bytes+1);
- gfs_save_t *entries=(gfs_save_t*)calloc((size_t)maximum_entries,sizeof(gfs_save_t));
- if(!data||!entries){if(f)fclose(f);free(data);free(entries);free(tmp);return -1;}
+ if(!data){if(f)fclose(f);free(tmp);return -1;}
  if(f){
   if(fread(data,1,(size_t)bytes,f)!=(size_t)bytes){fclose(f);free(data);free(entries);free(tmp);return -1;}
   fclose(f);
@@ -55,7 +54,7 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
   * cannot round-trip. An unknown or malformed row is not an empty save. */
  int expected=0;
  if(bytes && memchr(data,0,(size_t)bytes)){
-  free(data);free(entries);free(tmp);return -1;
+  free(data);free(tmp);return -1;
  }
  for(const char *line=data;*line;){
   const char *end=strchr(line,'\n');
@@ -65,8 +64,16 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
   if(p<end&&*p!='#')expected++;
   line=*end?end+1:end;
  }
- if(expected>maximum_entries){free(data);free(entries);free(tmp);return -1;}
- int count=bytes?gfs_parse_index(data,entries,maximum_entries):0;
+ if(expected>maximum_entries||incoming_count>maximum_entries-expected){
+  free(data);free(tmp);return -1;
+ }
+ /* Allocate for existing records and this merge, not the 8192-entry ceiling.
+  * Keep one slot for empty files because calloc(0) is implementation-defined. */
+ size_t capacity=(size_t)expected+(size_t)incoming_count;
+ if(!capacity)capacity=1;
+ gfs_save_t *entries=(gfs_save_t*)calloc(capacity,sizeof(gfs_save_t));
+ if(!entries){free(data);free(tmp);return -1;}
+ int count=bytes?gfs_parse_index(data,entries,expected?expected:1):0;
  free(data);
  if(count<0||count!=expected){free(entries);free(tmp);return -1;}
  for(int i=0;i<incoming_count;i++){
