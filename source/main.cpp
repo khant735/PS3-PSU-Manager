@@ -5032,7 +5032,15 @@ static int saves_import_category_pages(){
     gfs_curl_release(html,NULL);
     return -4; /* Do not continue requesting pages after denial. */
    }
-   if(status!=200||!html){gfs_curl_release(html,NULL);if(pass)break;continue;}
+   if(status!=200||!html){
+    if(diag){fprintf(diag,"skip pass=%d index=%d status=%d url=%s\n",pass,i,status,url);fflush(diag);}
+    gfs_curl_release(html,NULL);
+    if(pass){
+     if(status==404||status==410){FILE *next=fopen(cursor_path,"wb");if(next){fprintf(next,"%d\n",i+1);fclose(next);}continue;}
+     break; /* Retry temporary transport failures on next refresh. */
+    }
+    continue;
+   }
    successful++;
    if(pass){
     unsigned gid=0,sid=0;
