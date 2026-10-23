@@ -38,28 +38,28 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
   matched++;
   char *detail_html=NULL;
   if(read_page(urls[i],fetch,release,ctx,&detail_html,&length)){
-   fprintf(stderr,"GameFAQs detail unavailable: %s\\n",urls[i]);
+   fprintf(stderr,"GameFAQs detail unavailable: %s\n",urls[i]);
    failed++;
    continue;
   }
   fetched++;
   /* Never add PAGE placeholders: only validated direct download URLs
    * returned by the detail parser are eligible for the catalogue. */
-  gfs_save_t records[64];
-  memset(records,0,sizeof(records));
+  gfs_save_t *records=(gfs_save_t*)calloc(64,sizeof(*records));
+  if(!records){release(detail_html,ctx);failed++;continue;}
   int n=gfs_extract_detail_html(detail_html,urls[i],game,region,records,64);
   release(detail_html,ctx);
-  if(n<0){failed++;continue;}
-  if(!n)continue;
+  if(n<=0){free(records);if(n<0)failed++;continue;}
   int merged=gfs_merge_index_file(index_path,records,n,maximum_entries);
+  free(records);
   if(merged<0){
-   fprintf(stderr,"GameFAQs detail merge failed: %s\\n",urls[i]);
+   fprintf(stderr,"GameFAQs detail merge failed: %s\n",urls[i]);
    failed++;
   }else verified+=n;
  }
- fprintf(stderr,"GameFAQs detail summary: matched=%d fetched=%d verified_urls=%d failed=%d listing=%s\\n",
+ fprintf(stderr,"GameFAQs detail summary: matched=%d fetched=%d verified_urls=%d failed=%d listing=%s\n",
          matched,fetched,verified,failed,listing_url);
- if(!matched)fprintf(stderr,"GameFAQs no recognized individual save links: %s\\n",listing_url);
+ if(!matched)fprintf(stderr,"GameFAQs no recognized individual save links: %s\n",listing_url);
 
  free(urls);
  return verified;
