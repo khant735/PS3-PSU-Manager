@@ -5052,23 +5052,24 @@ static int saves_import_category_pages(){
    }
    successful++;
    if(pass){
-    unsigned gid=0,sid=0;
-    /* A Saves tab is a game-level URL, not an individual save ID. */
+    /* A game-level Saves tab is not a downloadable save. Run the existing
+     * detail-link crawler rather than inserting a fake PAGE record. */
     const char *game_path=games[i]+strlen(host)+5;
+    unsigned gid=0;
     if(sscanf(game_path,"%u-",&gid)==1&&gid){
-     const char *slug=strchr(games[i]+strlen(host)+5,'-');
+     const char *slug=strchr(game_path,'-');
      if(slug){
-      slug++;gfs_save_t seed={0};size_t t=strlen(slug);
-      if(t>=sizeof(seed.game))t=sizeof(seed.game)-1;
-      memcpy(seed.game,slug,t);seed.game[t]=0;
-      for(size_t k=0;k<t;k++)if(seed.game[k]=='-')seed.game[k]=' ';
-      snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
-      snprintf(seed.format,sizeof(seed.format),"PAGE");
-      snprintf(seed.description,sizeof(seed.description),"GameFAQs Saves listing (unverified)");
-      snprintf(seed.page_url,sizeof(seed.page_url),"%s",url);
-      int merged=gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES);
-      if(diag){fprintf(diag,"listing game=%u merge=%d error_line=%d errno=%d index=%s url=%s\n",gid,merged,gfs_merge_error_line(),gfs_merge_error_errno(),g_saves_index_path,url);fflush(diag);}
-      if(merged>=0)imported++;
+      slug++;
+      char game_title[128];
+      size_t t=strlen(slug);
+      if(t>=sizeof(game_title))t=sizeof(game_title)-1;
+      memcpy(game_title,slug,t);game_title[t]=0;
+      for(size_t k=0;k<t;k++)if(game_title[k]=='-')game_title[k]=' ';
+      int crawled=gfs_crawl_listing_https(url,g_saves_index_path,
+          game_title,"Multiple / unverified",GFS_MAX_ENTRIES);
+      if(diag){fprintf(diag,"detail crawl game=%u result=%d index=%s url=%s\\n",
+          gid,crawled,g_saves_index_path,url);fflush(diag);}
+      if(crawled>0)imported+=crawled-1;
      }
     }
    }
@@ -5140,13 +5141,8 @@ static int saves_import_category_pages(){
     if(!t||t>=sizeof(title))continue;
     memcpy(title,slug,t);title[t]=0;
     for(size_t j=0;j<t;j++)if(title[j]=='-')title[j]=' ';
-    gfs_save_t seed={0};
-    snprintf(seed.game,sizeof(seed.game),"%s",title);
-    snprintf(seed.region,sizeof(seed.region),"Multiple / unverified");
-    snprintf(seed.format,sizeof(seed.format),"PAGE");
-    snprintf(seed.description,sizeof(seed.description),"GameFAQs Saves listing (unverified)");
-    snprintf(seed.page_url,sizeof(seed.page_url),"%s",link);
-    if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
+    /* Discovery is performed by the detail crawler above. A listing
+     * link must never be stored as an individual downloadable save. */
    }
    if(diag){fprintf(diag,"pass=%d url=%s bytes=%lu href=%d normalized=%d categories=%d games=%d imported=%d\n",pass,url,(unsigned long)length,href_count,normalized_count,cat_count,game_count,imported);fflush(diag);}
    gfs_curl_release(html,NULL);
