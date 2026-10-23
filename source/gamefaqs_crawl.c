@@ -49,6 +49,7 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
  /* Keep the discovered PAGE entries even when some individual detail pages
   * cannot be fetched. Their download URLs remain empty until verified. */
  int processed=1;
+ size_t length=0;
  for(int i=0;i<found;i++){
   unsigned detail_game=0,detail_id=0;
   if(!gfs_parse_save_page_ids(urls[i],&detail_game,&detail_id)||
