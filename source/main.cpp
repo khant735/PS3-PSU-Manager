@@ -5026,6 +5026,7 @@ static int saves_import_category_pages(){
    }
    if(status!=200||!html){gfs_curl_release(html,NULL);continue;}
    successful++;
+   int href_count=0,normalized_count=0;
    const char *p=html;
    while((p=strstr(p,"href"))!=NULL){
     href_count++;
@@ -5101,9 +5102,11 @@ static int saves_import_category_pages(){
     snprintf(seed.page_url,sizeof(seed.page_url),"%s",link);
     if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
    }
+   if(diag){fprintf(diag,"pass=%d url=%s bytes=%lu href=%d normalized=%d categories=%d games=%d imported=%d\n",pass,url,(unsigned long)length,href_count,normalized_count,cat_count,game_count,imported);fflush(diag);}
    gfs_curl_release(html,NULL);
   }
  }
+ if(diag){fprintf(diag,"FINAL successful=%d categories=%d games=%d imported=%d\n",successful,cat_count,game_count,imported);fclose(diag);}
  return successful?imported:-3;
 }
 static volatile int g_saves_category_mode=0;
