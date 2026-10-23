@@ -28,16 +28,20 @@ static int valid(const gfs_save_t *e){
 static int same(const gfs_save_t *a,const gfs_save_t *b){
  return !strcmp(a->page_url,b->page_url)&&!strcmp(a->download_url,b->download_url);
 }
-/* Keep failure diagnostics separate from the user-facing index. */
-static int merge_failure(int line,const char *path){
- int saved_errno=errno;
- FILE *log=fopen("/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_MERGE.LOG","ab");
- if(log){fprintf(log,"merge failure line=%d errno=%d path=%s\n",line,saved_errno,path?path:"(null)");fclose(log);}
+/* Expose the last merge failure to the caller's existing diagnostic stream. */
+static int last_merge_line=0;
+static int last_merge_errno=0;
+int gfs_merge_error_line(void){return last_merge_line;}
+int gfs_merge_error_errno(void){return last_merge_errno;}
+static int merge_failure(int line){
+ last_merge_line=line;
+ last_merge_errno=errno;
  return -1;
 }
-#define MERGE_FAIL(path) merge_failure(__LINE__,path)
+#define MERGE_FAIL(path) merge_failure(__LINE__)
 int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incoming_count,
                          int maximum_entries){
+ last_merge_line=0;last_merge_errno=0;errno=0;
  if(!path||!*path||incoming_count<0||(incoming_count&&!incoming)||
     maximum_entries<1||maximum_entries>GFS_MAX_ENTRIES)return MERGE_FAIL(path);
  size_t plen=strlen(path);
@@ -118,5 +122,6 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
  if(ok&&rename(tmp,path)!=0)ok=0;
  if(!ok)remove(tmp);
  free(entries);free(tmp);
- return ok?count:-1;
+ if(!ok)return MERGE_FAIL(path);
+ return count;
 }
