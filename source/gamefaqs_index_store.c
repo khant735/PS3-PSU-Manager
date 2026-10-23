@@ -46,7 +46,7 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
  char *data=(char*)malloc((size_t)bytes+1);
  if(!data){if(f)fclose(f);free(tmp);return -1;}
  if(f){
-  if(fread(data,1,(size_t)bytes,f)!=(size_t)bytes){fclose(f);free(data);free(entries);free(tmp);return -1;}
+  if(fread(data,1,(size_t)bytes,f)!=(size_t)bytes){fclose(f);free(data);free(tmp);return -1;}
   fclose(f);
  }
  data[bytes]=0;
