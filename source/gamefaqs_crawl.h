@@ -14,6 +14,10 @@ typedef void (*gfs_release_fn)(char *html,void *ctx);
 int gfs_crawl_listing(const char *listing_url,const char *index_path,
  const char *game,const char *region,int maximum_entries,
  gfs_fetch_fn fetch,gfs_release_fn release,void *ctx);
+/* Reuse an already fetched listing, avoiding a second network request. */
+int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *index_path,
+ const char *game,const char *region,int maximum_entries,
+ gfs_fetch_fn fetch,gfs_release_fn release,void *ctx);
 #ifdef __cplusplus
 }
 #endif
