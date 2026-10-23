@@ -5029,8 +5029,17 @@ static int saves_import_category_pages(){
    char *html=NULL;size_t length=0;
    int status=gfs_curl_fetch(url,&html,&length,NULL);
    if(status==401||status==403||status==429){
+    if(diag){fprintf(diag,"denied pass=%d index=%d status=%d url=%s\n",pass,i,status,url);fflush(diag);}
     gfs_curl_release(html,NULL);
-    return -4; /* Do not continue requesting pages after denial. */
+    if(pass&&(status==401||status==403)){
+     /* Archive access denial is page-specific; skip it without retrying
+      * indefinitely. Rate limits remain a hard stop. */
+     FILE *next=fopen(cursor_path,"wb");
+     if(next){fprintf(next,"%d\n",i+1);fclose(next);}
+     continue;
+    }
+    if(diag)fclose(diag);
+    return -4;
    }
    if(status!=200||!html){
     if(diag){fprintf(diag,"skip pass=%d index=%d status=%d url=%s\n",pass,i,status,url);fflush(diag);}
