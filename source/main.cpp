@@ -5061,7 +5061,7 @@ static int saves_import_category_pages(){
     normalized_count++;
     /* Do not follow encoded/query/fragment/external navigation targets. */
     if(strchr(link,'&')||strchr(link,'#')||strchr(link,'\\')||
-       strpbrk(link,"\\r\\n\\t "))continue;
+       strpbrk(link,"\r\n\t "))continue;
     const char *path=link+strlen(host);
     if(!pass&&!strncmp(path,"/ps2/category/999-all",21)){
      const char *q=path+21;
