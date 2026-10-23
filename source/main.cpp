@@ -5010,7 +5010,7 @@ static int saves_import_category_pages(){
  static char category[64][384],games[512][384];
  memset(category,0,sizeof(category));
  memset(games,0,sizeof(games));
- int cat_count=1,game_count=0,successful=0,imported=0;
+ int cat_count=1,game_count=0,successful=0,imported=0;\n FILE *diag=fopen("/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_PARSE.LOG","ab");
  snprintf(category[0],sizeof(category[0]),"%s/ps2/category/999-all",host);
  /* Two bounded passes: discover catalogue pagination/games, then Saves tabs. */
  for(int pass=0;pass<2;pass++){
@@ -5027,7 +5027,7 @@ static int saves_import_category_pages(){
    successful++;
    const char *p=html;
    while((p=strstr(p,"href"))!=NULL){
-    const char *a=p+4;while(*a==' '||*a==9)a++;
+    href_count++;\n    const char *a=p+4;while(*a==' '||*a==9)a++;
     if(*a!='='){p+=4;continue;}a++;
     while(*a==' '||*a==9)a++;
     char quote=*a;if(quote!=39&&quote!=34){p+=4;continue;}a++;
@@ -5055,7 +5055,7 @@ static int saves_import_category_pages(){
      if(strncmp(w,"https://gamefaqs.gamespot.com/ps2/",34))continue;
      snprintf(link,sizeof(link),"%s",w);
     }
-    /* Do not follow encoded/query/fragment/external navigation targets. */
+    normalized_count++;\n    /* Do not follow encoded/query/fragment/external navigation targets. */
     if(strchr(link,'&')||strchr(link,'#')||strchr(link,'\\')||
        strpbrk(link,"\\r\\n\\t "))continue;
     const char *path=link+strlen(host);
