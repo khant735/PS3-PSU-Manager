@@ -5044,7 +5044,9 @@ static int saves_import_category_pages(){
    successful++;
    if(pass){
     unsigned gid=0,sid=0;
-    if(gfs_parse_save_page_ids(url,&gid,&sid)&&gid&&!sid){
+    /* A Saves tab is a game-level URL, not an individual save ID. */
+    const char *game_path=games[i]+strlen(host)+5;
+    if(sscanf(game_path,"%u-",&gid)==1&&gid){
      const char *slug=strchr(games[i]+strlen(host)+5,'-');
      if(slug){
       slug++;gfs_save_t seed={0};size_t t=strlen(slug);
@@ -5055,7 +5057,9 @@ static int saves_import_category_pages(){
       snprintf(seed.format,sizeof(seed.format),"PAGE");
       snprintf(seed.description,sizeof(seed.description),"GameFAQs Saves listing (unverified)");
       snprintf(seed.page_url,sizeof(seed.page_url),"%s",url);
-      if(gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES)>=0)imported++;
+      int merged=gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES);
+      if(diag){fprintf(diag,"listing game=%u merge=%d url=%s\n",gid,merged,url);fflush(diag);}
+      if(merged>=0)imported++;
      }
     }
    }
