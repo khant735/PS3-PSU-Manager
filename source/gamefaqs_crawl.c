@@ -17,20 +17,18 @@ static int read_page(const char *url,gfs_fetch_fn fetch,gfs_release_fn release,
     (*html)[*length]!=0){release(*html,ctx);*html=NULL;return -1;}
  return 0;
 }
-int gfs_crawl_listing(const char *listing_url,const char *index_path,
+int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *index_path,
  const char *game,const char *region,int maximum_entries,
  gfs_fetch_fn fetch,gfs_release_fn release,void *ctx){
  unsigned gid=0,sid=0;
- if(!listing_url||!index_path||!game||!region||!fetch||!release||
+ if(!listing_url||!html||!index_path||!game||!region||!fetch||!release||
     !gfs_parse_save_page_ids(listing_url,&gid,&sid)||sid||
     maximum_entries<1||maximum_entries>GFS_MAX_ENTRIES)return -1;
- char *html=NULL;size_t length=0;
- if(read_page(listing_url,fetch,release,ctx,&html,&length))return -1;
  char (*urls)[384]=calloc(GFS_DETAIL_LIMIT,sizeof(*urls));
- if(!urls){release(html,ctx);return -1;}
+ if(!urls)return -1;
  int found=gfs_discover_save_links(html,urls,GFS_DETAIL_LIMIT);
- if(found<0){free(urls);release(html,ctx);return -1;}
- release(html,ctx);
+ if(found<0){free(urls);return -1;}
+ fprintf(stderr,"GameFAQs listing links: discovered=%d url=%s\n",found,listing_url);
  int result=0;
  int discovered=0;
  for(int i=0;i<found;i++){
@@ -66,4 +64,16 @@ int gfs_crawl_listing(const char *listing_url,const char *index_path,
  }
  free(urls);
  return processed;
+}
+
+int gfs_crawl_listing(const char *listing_url,const char *index_path,
+ const char *game,const char *region,int maximum_entries,
+ gfs_fetch_fn fetch,gfs_release_fn release,void *ctx){
+ if(!listing_url||!fetch||!release)return -1;
+ char *html=NULL;size_t length=0;
+ if(read_page(listing_url,fetch,release,ctx,&html,&length))return -1;
+ int result=gfs_crawl_listing_html(listing_url,html,index_path,game,region,
+                                  maximum_entries,fetch,release,ctx);
+ release(html,ctx);
+ return result;
 }
