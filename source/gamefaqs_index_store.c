@@ -28,25 +28,33 @@ static int valid(const gfs_save_t *e){
 static int same(const gfs_save_t *a,const gfs_save_t *b){
  return !strcmp(a->page_url,b->page_url)&&!strcmp(a->download_url,b->download_url);
 }
+/* Keep failure diagnostics separate from the user-facing index. */
+static int merge_failure(int line,const char *path){
+ int saved_errno=errno;
+ FILE *log=fopen("/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_MERGE.LOG","ab");
+ if(log){fprintf(log,"merge failure line=%d errno=%d path=%s\n",line,saved_errno,path?path:"(null)");fclose(log);}
+ return -1;
+}
+#define MERGE_FAIL(path) merge_failure(__LINE__,path)
 int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incoming_count,
                          int maximum_entries){
  if(!path||!*path||incoming_count<0||(incoming_count&&!incoming)||
-    maximum_entries<1||maximum_entries>GFS_MAX_ENTRIES)return -1;
+    maximum_entries<1||maximum_entries>GFS_MAX_ENTRIES)return MERGE_FAIL(path);
  size_t plen=strlen(path);
- if(plen>900)return -1;
+ if(plen>900)return MERGE_FAIL(path);
  char *tmp=(char*)malloc(plen+32);
- if(!tmp)return -1;
+ if(!tmp)return MERGE_FAIL(path);
  snprintf(tmp,plen+32,"%s.tmp",path);
  /* Bound old file size and keep its bytes intact if parsing is incomplete. */
  FILE *f=fopen(path,"rb");long bytes=0;
  if(f){
   if(fseek(f,0,SEEK_END)!=0||(bytes=ftell(f))<0||bytes>maximum_entries*1800L||
-     fseek(f,0,SEEK_SET)!=0){fclose(f);free(tmp);return -1;}
- }else if(errno!=ENOENT){free(tmp);return -1;}
+     fseek(f,0,SEEK_SET)!=0){fclose(f);free(tmp);return MERGE_FAIL(path);}
+ }else if(errno!=ENOENT){free(tmp);return MERGE_FAIL(path);}
  char *data=(char*)malloc((size_t)bytes+1);
- if(!data){if(f)fclose(f);free(tmp);return -1;}
+ if(!data){if(f)fclose(f);free(tmp);return MERGE_FAIL(path);}
  if(f){
-  if(fread(data,1,(size_t)bytes,f)!=(size_t)bytes){fclose(f);free(data);free(tmp);return -1;}
+  if(fread(data,1,(size_t)bytes,f)!=(size_t)bytes){fclose(f);free(data);free(tmp);return MERGE_FAIL(path);}
   fclose(f);
  }
  data[bytes]=0;
@@ -54,7 +62,7 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
   * cannot round-trip. An unknown or malformed row is not an empty save. */
  int expected=0;
  if(bytes && memchr(data,0,(size_t)bytes)){
-  free(data);free(tmp);return -1;
+  free(data);free(tmp);return MERGE_FAIL(path);
  }
  for(const char *line=data;*line;){
   const char *end=strchr(line,'\n');
@@ -65,19 +73,19 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
   line=*end?end+1:end;
  }
  if(expected>maximum_entries||incoming_count>maximum_entries-expected){
-  free(data);free(tmp);return -1;
+  free(data);free(tmp);return MERGE_FAIL(path);
  }
  /* Allocate for existing records and this merge, not the 8192-entry ceiling.
   * Keep one slot for empty files because calloc(0) is implementation-defined. */
  size_t capacity=(size_t)expected+(size_t)incoming_count;
  if(!capacity)capacity=1;
  gfs_save_t *entries=(gfs_save_t*)calloc(capacity,sizeof(gfs_save_t));
- if(!entries){free(data);free(tmp);return -1;}
+ if(!entries){free(data);free(tmp);return MERGE_FAIL(path);}
  int count=bytes?gfs_parse_index(data,entries,expected?expected:1):0;
  free(data);
- if(count<0||count!=expected){free(entries);free(tmp);return -1;}
+ if(count<0||count!=expected){free(entries);free(tmp);return MERGE_FAIL(path);}
  for(int i=0;i<incoming_count;i++){
-  if(!valid(&incoming[i])){free(entries);free(tmp);return -1;}
+  if(!valid(&incoming[i])){free(entries);free(tmp);return MERGE_FAIL(path);}
   int dup=0;
   for(int j=0;j<count;j++){
    if(same(&entries[j],&incoming[i])){dup=1;break;}
@@ -94,11 +102,11 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
    }
   }
   if(dup)continue;
-  if(count>=maximum_entries){free(entries);free(tmp);return -1;}
+  if(count>=maximum_entries){free(entries);free(tmp);return MERGE_FAIL(path);}
   entries[count++]=incoming[i];
  }
  f=fopen(tmp,"wb");
- if(!f){free(entries);free(tmp);return -1;}
+ if(!f){free(entries);free(tmp);return MERGE_FAIL(path);}
  int ok=1;
  for(int i=0;i<count;i++){
   const gfs_save_t *e=&entries[i];
