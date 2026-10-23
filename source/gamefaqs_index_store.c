@@ -119,7 +119,29 @@ int gfs_merge_index_file(const char *path,const gfs_save_t *incoming,int incomin
  }
  if(fflush(f)!=0)ok=0;
  if(fclose(f)!=0)ok=0;
- if(ok&&rename(tmp,path)!=0)ok=0;
+ /* PS3 rename can reject an existing destination with EEXIST.
+  * Stage the original as a backup and restore it if replacement fails. */
+ if(ok&&rename(tmp,path)!=0){
+  int rename_error=errno;
+  if(rename_error==EEXIST){
+   size_t n=strlen(path)+5;
+   char *backup=(char*)malloc(n);
+   if(backup){
+    snprintf(backup,n,"%s.bak",path);
+    FILE *existing=fopen(backup,"rb");
+    if(existing){fclose(existing);errno=EEXIST;ok=0;}
+    else if(rename(path,backup)!=0)ok=0;
+    else if(rename(tmp,path)==0)remove(backup);
+    else{
+     int replacement_error=errno;
+     rename(backup,path);
+     errno=replacement_error;
+     ok=0;
+    }
+    free(backup);
+   }else{errno=ENOMEM;ok=0;}
+  }else{errno=rename_error;ok=0;}
+ }
  if(!ok)remove(tmp);
  free(entries);free(tmp);
  if(!ok)return MERGE_FAIL(path);
