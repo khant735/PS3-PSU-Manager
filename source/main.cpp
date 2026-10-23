@@ -5067,7 +5067,7 @@ static int saves_import_category_pages(){
       snprintf(seed.description,sizeof(seed.description),"GameFAQs Saves listing (unverified)");
       snprintf(seed.page_url,sizeof(seed.page_url),"%s",url);
       int merged=gfs_merge_index_file(g_saves_index_path,&seed,1,GFS_MAX_ENTRIES);
-      if(diag){fprintf(diag,"listing game=%u merge=%d url=%s\n",gid,merged,url);fflush(diag);}
+      if(diag){fprintf(diag,"listing game=%u merge=%d error_line=%d errno=%d index=%s url=%s\n",gid,merged,gfs_merge_error_line(),gfs_merge_error_errno(),g_saves_index_path,url);fflush(diag);}
       if(merged>=0)imported++;
      }
     }
