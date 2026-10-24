@@ -87,9 +87,27 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
   char fetch_url[512];
   if(!archived_detail_url(listing_url,urls[i],fetch_url,sizeof(fetch_url))){failed++;continue;}
   if(read_page(fetch_url,fetch,release,ctx,&detail_html,&length)){
-   fprintf(stderr,"GameFAQs detail unavailable: %s\n",urls[i]);
-   failed++;
-   continue;
+   /* A listing capture does not imply its detail was archived at the
+    * same timestamp. Retry the original URL through the caller's
+    * CachedView/Wayback resolver, which selects its own capture. */
+   const char *original=urls[i];
+   const char *wayback="https://web.archive.org/web/";
+   if(!strncmp(original,wayback,strlen(wayback))){
+    const char *q=original+strlen(wayback);
+    while(*q>='0'&&*q<='9')q++;
+    if(!strncmp(q,"id_/",4)||!strncmp(q,"if_/",4))q+=4;
+    else if(*q=='/')q++;
+    if(!strncmp(q,"https://gamefaqs.gamespot.com/",30)||
+       !strncmp(q,"https://www.gamefaqs.com/",25))original=q;
+   }
+   if(!strcmp(original,fetch_url)||
+      read_page(original,fetch,release,ctx,&detail_html,&length)){
+    fprintf(stderr,"GameFAQs detail unavailable after independent snapshot lookup: %s\n",urls[i]);
+    failed++;
+    continue;
+   }
+   snprintf(fetch_url,sizeof(fetch_url),"%s",original);
+   fprintf(stderr,"GameFAQs detail recovered via independent Wayback lookup: %s\n",original);
   }
   fetched++;
   /* Never add PAGE placeholders: only validated direct download URLs
