@@ -42,6 +42,27 @@ static void diagnose_listing_links(const char *html){
  fprintf(stderr,"GameFAQs href diagnostic: total=%d save_related=%d shown=%d\n",hrefs,saves,shown);
 }
 
+/* Keep every detail request inside the timestamped Wayback snapshot. */
+static int archived_detail_url(const char *listing,const char *detail,char *out,size_t cap){
+ const char *base="https://web.archive.org/web/";
+ if(strncmp(listing,base,strlen(base))){snprintf(out,cap,"%s",detail);return 1;}
+ const char *p=listing+strlen(base);char stamp[15];
+ for(int i=0;i<14;i++){if(p[i]<'0'||p[i]>'9')return 0;stamp[i]=p[i];}
+ stamp[14]=0;
+ const char *inner=detail;
+ if(!strncmp(detail,base,strlen(base))){
+  const char *q=detail+strlen(base);int i=0;
+  while(i<14&&q[i]>='0'&&q[i]<='9')i++;
+  if(i!=14)return 0;q+=14;
+  if(!strncmp(q,"id_/",4)||!strncmp(q,"if_/",4))q+=4;
+  else if(*q=='/')q++;
+  else return 0;
+  inner=q;
+ }
+ int n=snprintf(out,cap,"%s%s/%s",base,stamp,inner);
+ return n>0&&(size_t)n<cap;
+}
+
 int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *index_path,
  const char *game,const char *region,int maximum_entries,
  gfs_fetch_fn fetch,gfs_release_fn release,void *ctx){
@@ -62,7 +83,9 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
      detail_game!=gid||!detail_id)continue;
   matched++;
   char *detail_html=NULL;
-  if(read_page(urls[i],fetch,release,ctx,&detail_html,&length)){
+  char fetch_url[512];
+  if(!archived_detail_url(listing_url,urls[i],fetch_url,sizeof(fetch_url))){failed++;continue;}
+  if(read_page(fetch_url,fetch,release,ctx,&detail_html,&length)){
    fprintf(stderr,"GameFAQs detail unavailable: %s\n",urls[i]);
    failed++;
    continue;
@@ -72,7 +95,7 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
    * returned by the detail parser are eligible for the catalogue. */
   gfs_save_t *records=(gfs_save_t*)calloc(64,sizeof(*records));
   if(!records){release(detail_html,ctx);failed++;continue;}
-  int n=gfs_extract_detail_html(detail_html,urls[i],game,region,records,64);
+  int n=gfs_extract_detail_html(detail_html,fetch_url,game,region,records,64);
   release(detail_html,ctx);
   if(n<=0){free(records);if(n<0)failed++;continue;}
   int merged=gfs_merge_index_file(index_path,records,n,maximum_entries);
