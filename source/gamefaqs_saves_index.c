@@ -22,7 +22,7 @@ static const char *archive_inner(const char *url){
  if(!strncmp(p,"id_/",4)||!strncmp(p,"if_/",4))p+=4;
  else if(*p=='/')p++;
  else return NULL;
- if(strncmp(p,"https://gamefaqs.gamespot.com/",31)&&
+ if(strncmp(p,"https://gamefaqs.gamespot.com/",30)&&
     strncmp(p,"https://www.gamefaqs.com/",25))return NULL;
  return p;
 }
