@@ -88,6 +88,13 @@ int gfs_discover_save_links(const char *html, char (*urls)[384], int capacity){
    snprintf(full,sizeof(full),"%s%s",host,url);
    copy(url,sizeof(url),full);
   }
+  /* Wayback may rewrite links as /web/TIMESTAMP/https://... */
+  if(prefix(url,"/web/")){
+   char full[384];const char *host="https://web.archive.org";
+   if(strlen(host)+strlen(url)>=sizeof(full))continue;
+   snprintf(full,sizeof(full),"%s%s",host,url);
+   copy(url,sizeof(url),full);
+  }
   /* Do not misindex HTML entity-encoded links as raw URLs. */
   if(strchr(url,38)||strpbrk(url,"\\\r\n\t "))continue;
   unsigned game_id=0,save_id=0;
