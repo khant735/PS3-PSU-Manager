@@ -10,8 +10,20 @@ static int host_match(const char *url,const char *host){
  if(n!=strlen(host)||strncmp(p,host,n))return 0;
  return !e||*e=='/'||*e=='?';
 }
+static const char *archive_inner(const char *url){
+ const char *prefix="https://web.archive.org/web/";
+ if(strncmp(url,prefix,strlen(prefix)))return url;
+ const char *p=url+strlen(prefix);
+ int digits=0;while(*p>='0'&&*p<='9'&&digits<14){p++;digits++;}
+ if(digits!=14)return NULL;
+ if(!strncmp(p,"id_/",4)||!strncmp(p,"if_/",4))p+=4;
+ else if(*p=='/')p++;
+ else return NULL;
+ return !strncmp(p,"https://gamefaqs.gamespot.com/",31)||!strncmp(p,"https://www.gamefaqs.com/",25)?p:NULL;
+}
 static int safe_url(const char *url){
  if(!url||strlen(url)>500||strpbrk(url,"\r\n\t\\@ "))return 0;
+ url=archive_inner(url);if(!url)return 0;
  return host_match(url,"gamefaqs.gamespot.com")||host_match(url,"www.gamefaqs.com");
 }
 int gfs_download_allowed(const char *url){
@@ -68,6 +80,7 @@ int gfs_parse_index(const char *data,gfs_save_t *out,int cap){
    The save-detail page is NOT a direct download URL. */
 int gfs_parse_save_page_ids(const char *url, unsigned *game_id, unsigned *save_id){
  if(!safe_url(url)||!game_id||!save_id)return 0;
+ url=archive_inner(url);if(!url)return 0;
  const char *p=strchr(url+8,'/');
  if(!p||strncmp(p,"/ps2/",5))return 0;
  p+=5;
