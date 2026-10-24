@@ -29,7 +29,7 @@ static void diagnose_listing_links(const char *html,unsigned listing_gid){
   if(!gfs_parse_save_page_ids(urls[i],&gid,&sid)||!sid)continue;
   if(gid!=listing_gid){other_game++;continue;}
   accepted++;
-  if(accepted<=12)fprintf(stderr,"GameFAQs valid PS2 save[%d]: %.220s\\n",accepted-1,urls[i]);
+  if(accepted<=12)fprintf(stderr,"GameFAQs valid PS2 save[%d]: %.220s\n",accepted-1,urls[i]);
  }
  int hrefs=0;const char *p=html;
  while((p=strstr(p,"href"))!=NULL&&hrefs<4096){
@@ -38,7 +38,7 @@ static void diagnose_listing_links(const char *html,unsigned listing_gid){
   if(*q=='=')hrefs++;
   p+=4;
  }
- fprintf(stderr,"GameFAQs link diagnostic: hrefs=%d valid_ps2_details=%d other_game=%d non_save_or_duplicate=%d\\n",
+ fprintf(stderr,"GameFAQs link diagnostic: hrefs=%d valid_ps2_details=%d other_game=%d non_save_or_duplicate=%d\n",
          hrefs,accepted,other_game,hrefs-accepted-other_game);
  free(urls);
 }
