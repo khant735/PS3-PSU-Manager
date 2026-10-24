@@ -17,6 +17,31 @@ static int read_page(const char *url,gfs_fetch_fn fetch,gfs_release_fn release,
     (*html)[*length]!=0){release(*html,ctx);*html=NULL;return -1;}
  return 0;
 }
+/* Bounded, public-link diagnostics for archive HTML with no recognized save IDs. */
+static void diagnose_listing_links(const char *html){
+ const char *p=html;int hrefs=0,saves=0,shown=0;
+ while((p=strstr(p,"href"))!=NULL && hrefs<4096){
+  const char *a=p+4;while(*a==' '||*a=='\t')a++;
+  if(*a!='='){p+=4;continue;}a++;
+  while(*a==' '||*a=='\t')a++;
+  char q=*a;if(q!='\''&&q!='"'){p+=4;continue;}a++;
+  const char *end=strchr(a,q);if(!end)break;
+  size_t n=(size_t)(end-a);p=end+1;hrefs++;
+  if(!n||n>=384)continue;
+  char url[384];memcpy(url,a,n);url[n]=0;
+  if(strstr(url,"save")||strstr(url,"download")){
+   saves++;
+   if(shown<12){
+    /* Avoid query strings, tokens and excessive output. */
+    char *cut=strpbrk(url,"?#");if(cut)*cut=0;
+    fprintf(stderr,"GameFAQs candidate href[%d]: %.220s\n",shown,url);
+    shown++;
+   }
+  }
+ }
+ fprintf(stderr,"GameFAQs href diagnostic: total=%d save_related=%d shown=%d\n",hrefs,saves,shown);
+}
+
 int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *index_path,
  const char *game,const char *region,int maximum_entries,
  gfs_fetch_fn fetch,gfs_release_fn release,void *ctx){
@@ -59,7 +84,7 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
  }
  fprintf(stderr,"GameFAQs detail summary: matched=%d fetched=%d verified_urls=%d failed=%d listing=%s\n",
          matched,fetched,verified,failed,listing_url);
- if(!matched)fprintf(stderr,"GameFAQs no recognized individual save links: %s\n",listing_url);
+ if(!matched){fprintf(stderr,"GameFAQs no recognized individual save links: %s\n",listing_url);diagnose_listing_links(html);}
 
  free(urls);
  return verified;
