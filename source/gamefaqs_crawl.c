@@ -64,6 +64,58 @@ static int archived_detail_url(const char *listing,const char *detail,char *out,
  return n>0&&(size_t)n<cap;
 }
 
+/* Query actual Wayback captures; never guess timestamps or issue a request
+ * for every second between 1995 and 2026. CDX returns newest first. */
+static int historical_detail(const char *original,gfs_fetch_fn fetch,
+ gfs_release_fn release,void *ctx,char **html,size_t *length,
+ char *resolved,size_t cap){
+ const char *endpoint="https://web.archive.org/cdx/search/cdx?url=";
+ char encoded[1024];size_t k=0;
+ for(const unsigned char *p=(const unsigned char*)original;*p;p++){
+  unsigned char c=*p;
+  if((c>='a'&&c<='z')||(c>='A'&&c<='Z')||
+     (c>='0'&&c<='9')||c=='-'||c=='_'||c=='.'||c=='~'){
+   if(k+1>=sizeof(encoded))return -1;encoded[k++]=(char)c;
+  }else{
+   if(k+3>=sizeof(encoded))return -1;
+   snprintf(encoded+k,4,"%%%02X",(unsigned)c);k+=3;
+  }
+ }
+ encoded[k]=0;
+ /* CDX paging preserves chronological order without storing thousands
+  * of captures in PS3 memory. Each page is processed before the next. */
+ for(int page=0;page<128;page++){
+  char query[1536];
+  int n=snprintf(query,sizeof(query),
+   "%s%s&from=1995&to=2026&output=txt&fl=timestamp&filter=statuscode%%3A200&sort=reverse&limit=100&offset=%d",
+   endpoint,encoded,page*100);
+  if(n<=0||(size_t)n>=sizeof(query))return -1;
+  char *body=NULL;size_t bytes=0;
+  if(read_page(query,fetch,release,ctx,&body,&bytes))return -1;
+  int count=0;char *p=body;
+  while(*p){
+   char stamp[15];int j=0;
+   while(p[j]>='0'&&p[j]<='9'&&j<14){stamp[j]=p[j];j++;}
+   if(j==14&&(p[j]=='\n'||p[j]=='\r'||p[j]==0)){
+    stamp[14]=0;count++;
+    n=snprintf(resolved,cap,"https://web.archive.org/web/%s/%s",stamp,original);
+    if(n>0&&(size_t)n<cap){
+     fprintf(stderr,"GameFAQs CDX candidate: %s\n",resolved);
+     if(!read_page(resolved,fetch,release,ctx,html,length)){
+      fprintf(stderr,"GameFAQs CDX detail fetched: %s\n",resolved);
+      release(body,ctx);return 0;
+     }
+    }
+   }
+   while(*p&&*p!='\n')p++;
+   if(*p=='\n')p++;
+  }
+  release(body,ctx);
+  if(count<100)break;
+ }
+ return -1;
+}
+
 int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *index_path,
  const char *game,const char *region,int maximum_entries,
  gfs_fetch_fn fetch,gfs_release_fn release,void *ctx){
@@ -100,14 +152,15 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
     if(!strncmp(q,"https://gamefaqs.gamespot.com/",30)||
        !strncmp(q,"https://www.gamefaqs.com/",25))original=q;
    }
-   if(!strcmp(original,fetch_url)||
-      read_page(original,fetch,release,ctx,&detail_html,&length)){
-    fprintf(stderr,"GameFAQs detail unavailable after independent snapshot lookup: %s\n",urls[i]);
+   if(historical_detail(original,fetch,release,ctx,&detail_html,&length,
+                        fetch_url,sizeof(fetch_url)) &&
+      (!strcmp(original,fetch_url)||
+       read_page(original,fetch,release,ctx,&detail_html,&length))){
+    fprintf(stderr,"GameFAQs detail unavailable after historical CDX search: %s\n",urls[i]);
     failed++;
     continue;
    }
-   snprintf(fetch_url,sizeof(fetch_url),"%s",original);
-   fprintf(stderr,"GameFAQs detail recovered via independent Wayback lookup: %s\n",original);
+   fprintf(stderr,"GameFAQs detail recovered: %s\n",fetch_url);
   }
   fetched++;
   /* Never add PAGE placeholders: only validated direct download URLs
