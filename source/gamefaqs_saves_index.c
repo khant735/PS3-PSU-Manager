@@ -10,16 +10,21 @@ static int host_match(const char *url,const char *host){
  if(n!=strlen(host)||strncmp(p,host,n))return 0;
  return !e||*e=='/'||*e=='?';
 }
+/* Wayback captures use timestamps of 1-14 digits (e.g. /web/2/).
+ * Accept both the archive's canonical and short replay URL forms. */
 static const char *archive_inner(const char *url){
  const char *prefix="https://web.archive.org/web/";
  if(strncmp(url,prefix,strlen(prefix)))return url;
  const char *p=url+strlen(prefix);
- int digits=0;while(*p>='0'&&*p<='9'&&digits<14){p++;digits++;}
- if(digits!=14)return NULL;
+ int digits=0;
+ while(*p>='0'&&*p<='9'&&digits<14){p++;digits++;}
+ if(!digits)return NULL;
  if(!strncmp(p,"id_/",4)||!strncmp(p,"if_/",4))p+=4;
  else if(*p=='/')p++;
  else return NULL;
- return !strncmp(p,"https://gamefaqs.gamespot.com/",31)||!strncmp(p,"https://www.gamefaqs.com/",25)?p:NULL;
+ if(strncmp(p,"https://gamefaqs.gamespot.com/",31)&&
+    strncmp(p,"https://www.gamefaqs.com/",25))return NULL;
+ return p;
 }
 static int safe_url(const char *url){
  if(!url||strlen(url)>500||strpbrk(url,"\r\n\t\\@ "))return 0;
