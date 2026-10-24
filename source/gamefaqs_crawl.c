@@ -17,29 +17,30 @@ static int read_page(const char *url,gfs_fetch_fn fetch,gfs_release_fn release,
     (*html)[*length]!=0){release(*html,ctx);*html=NULL;return -1;}
  return 0;
 }
-/* Bounded, public-link diagnostics for archive HTML with no recognized save IDs. */
-static void diagnose_listing_links(const char *html){
- const char *p=html;int hrefs=0,saves=0,shown=0;
- while((p=strstr(p,"href"))!=NULL && hrefs<4096){
-  const char *a=p+4;while(*a==' '||*a=='\t')a++;
-  if(*a!='='){p+=4;continue;}a++;
-  while(*a==' '||*a=='\t')a++;
-  char q=*a;if(q!='\''&&q!='"'){p+=4;continue;}a++;
-  const char *end=strchr(a,q);if(!end)break;
-  size_t n=(size_t)(end-a);p=end+1;hrefs++;
-  if(!n||n>=384)continue;
-  char url[384];memcpy(url,a,n);url[n]=0;
-  if(strstr(url,"save")||strstr(url,"download")){
-   saves++;
-   if(shown<12){
-    /* Avoid query strings, tokens and excessive output. */
-    char *cut=strpbrk(url,"?#");if(cut)*cut=0;
-    fprintf(stderr,"GameFAQs candidate href[%d]: %.220s\n",shown,url);
-    shown++;
-   }
-  }
+/* Diagnostics use the same strict URL parser as the crawler.  Never
+ * classify navigation links merely because they contain 'save' or 'game'. */
+static void diagnose_listing_links(const char *html,unsigned listing_gid){
+ char (*urls)[384]=calloc(GFS_DETAIL_LIMIT,sizeof(*urls));
+ if(!urls)return;
+ int found=gfs_discover_save_links(html,urls,GFS_DETAIL_LIMIT);
+ int accepted=0,other_game=0;
+ if(found>0)for(int i=0;i<found;i++){
+  unsigned gid=0,sid=0;
+  if(!gfs_parse_save_page_ids(urls[i],&gid,&sid)||!sid)continue;
+  if(gid!=listing_gid){other_game++;continue;}
+  accepted++;
+  if(accepted<=12)fprintf(stderr,"GameFAQs valid PS2 save[%d]: %.220s\\n",accepted-1,urls[i]);
  }
- fprintf(stderr,"GameFAQs href diagnostic: total=%d save_related=%d shown=%d\n",hrefs,saves,shown);
+ int hrefs=0;const char *p=html;
+ while((p=strstr(p,"href"))!=NULL&&hrefs<4096){
+  const char *q=p+4;
+  while(*q==' '||*q=='\\t')q++;
+  if(*q=='=')hrefs++;
+  p+=4;
+ }
+ fprintf(stderr,"GameFAQs link diagnostic: hrefs=%d valid_ps2_details=%d other_game=%d non_save_or_duplicate=%d\\n",
+         hrefs,accepted,other_game,hrefs-accepted-other_game);
+ free(urls);
 }
 
 /* Keep every detail request inside the timestamped Wayback snapshot. */
@@ -107,7 +108,7 @@ int gfs_crawl_listing_html(const char *listing_url,const char *html,const char *
  }
  fprintf(stderr,"GameFAQs detail summary: matched=%d fetched=%d verified_urls=%d failed=%d listing=%s\n",
          matched,fetched,verified,failed,listing_url);
- if(!matched){fprintf(stderr,"GameFAQs no recognized individual save links: %s\n",listing_url);diagnose_listing_links(html);}
+ if(!matched){fprintf(stderr,"GameFAQs no recognized individual save links: %s\n",listing_url);diagnose_listing_links(html,gid);}
 
  free(urls);
  return verified;
