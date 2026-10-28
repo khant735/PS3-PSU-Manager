@@ -49,6 +49,7 @@
 #include "ps2_max_to_psu.h"
 #include "ps2_cbs_to_psu.h"
 #include "ps2_sharkport_header.h"
+#include "ps2_xpo_v1.h"
 
 extern "C" {
 #include "psu.h"
@@ -143,6 +144,17 @@ static int g_startup_overlay_cleanup_done=0;
 static int export_target_active=0;
 static char archive_path[PATHSZ]="";
 static int g_foreign_archive_view=0;
+/* Native read-only X-Port v1 archive browsing. */
+static int g_xpo_native_view=0;
+static ps2_xpo_v1_info *g_xpo_native_info=NULL;
+static unsigned char *g_xpo_native_data=NULL;
+static size_t g_xpo_native_size=0;
+static void close_xpo_native(){
+ free(g_xpo_native_info);g_xpo_native_info=NULL;
+ free(g_xpo_native_data);g_xpo_native_data=NULL;
+ g_xpo_native_size=0;g_xpo_native_view=0;
+}
+
 static char g_foreign_view_path[PATHSZ]="";
 static char g_foreign_source_path[PATHSZ]="";
 
@@ -2808,7 +2820,19 @@ static void refresh_fs(){
  closedir(d);qsort(items,item_count,sizeof(items[0]),cmp_items);if(selected>=item_count)selected=item_count?item_count-1:0;if(selected<0)selected=0;save_dir_cache(cwd);
 }
 static int psu_collect(const psu_entry_t*e,size_t,void*){if(!strcmp(e->name,".")||!strcmp(e->name,".."))return 0;if(item_count>=MAX_ITEMS)return 1;item_t*it=&items[item_count++];memset(it,0,sizeof(*it));strncpy(it->name,e->name,sizeof(it->name)-1);it->is_dir=(e->attr==PSU_ATTR_DIR);it->size=e->size;it->size_known=1;time_t ct=psu_time_to_time_t(&e->ctime),mt=psu_time_to_time_t(&e->mtime);it->latest_time=mt>ct?mt:ct;it->date_known=it->latest_time>0;return 0;}
+static void refresh_xpo_native(){
+ item_count=0;
+ if(!g_xpo_native_info)return;
+ for(unsigned i=0;i<g_xpo_native_info->record_count && item_count<MAX_ITEMS;i++){
+  const ps2_xpo_v1_record *r=&g_xpo_native_info->records[i];
+  item_t *it=&items[item_count++];memset(it,0,sizeof(*it));
+  snprintf(it->name,sizeof(it->name),"%s",r->name);
+  it->size=r->payload_size;it->size_known=1;it->is_dir=0;
+ }
+ if(selected>=item_count)selected=item_count?item_count-1:0;
+}
 static void refresh_psu(){
+ if(g_xpo_native_view){refresh_xpo_native();return;}
  item_count=0;int rc=psu_list(archive_path,psu_collect,NULL);
  if(rc)snprintf(status_line,sizeof(status_line),"PSU: %s",psu_strerror(rc));
  if(!rc)load_iconsys_icn_refs(); else clear_iconsys_icn_refs();
@@ -3261,9 +3285,34 @@ static const char *icon_diag_origin(unsigned long geometry,unsigned long texture
 static void icon_diag_name(char out[65],const unsigned char *p){memcpy(out,p,64);out[64]=0;}
 static int sharkport_details_active(){return g_foreign_archive_view &&
  (endswith(g_foreign_source_path,".sps")||endswith(g_foreign_source_path,".xps")||endswith(g_foreign_source_path,".xpo"));}
-static int psu_metadata_page_count(){if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 5+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
+static int psu_metadata_page_count(){if(g_xpo_native_view)return 1;if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 5+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
 static void sjis_title_slice_ascii(const unsigned char*src,size_t begin,size_t end,char*out,size_t cap){if(begin>end){size_t t=begin;begin=end;end=t;}if(end>68)end=68;ps2_sjis_title_ascii(src+begin,end-begin,out,cap);}
 static void draw_psu_metadata_modal(){
+ if(g_xpo_native_view){
+  int x=g_margin+20,y=g_title_y+55,w=(int)g_width-g_margin*2-40,h=(int)g_height-y-g_margin-35;
+  round_rect(x,y,w,h,10,0xFF0A1622u);rect(x+3,y+3,w-6,3,0xFF2CCBFFu);
+  int yy=y+20,lh=scale125(10*g_body_scale)+10;
+  textf(x+20,yy,0xFFFFFFFFu,g_title_scale,"X-PORT V1 DETAILS (READ ONLY)");yy+=lh+20;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Archive: %s",base_name(archive_path));yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Archive size: %u bytes",(unsigned)g_xpo_native_size);yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Record count: %u",g_xpo_native_info->record_count);yy+=lh;
+  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Total payload: %u bytes",(unsigned)g_xpo_native_info->payload_bytes);yy+=lh;
+  if(item_count>0 && selected>=0 && (unsigned)selected<g_xpo_native_info->record_count){
+   const ps2_xpo_v1_record *r=&g_xpo_native_info->records[selected];
+   yy+=lh;
+   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SELECTED RECORD");yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Filename: %s",r->name);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Size: %u bytes",(unsigned)r->payload_size);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Payload offset: 0x%08X",(unsigned)r->payload_offset);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Record header offset: 0x%08X",(unsigned)r->header_offset);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Attributes (raw): 0x%04X",r->attr_be);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Header words: %08X %08X",r->metadata_word_46,r->metadata_word_4a);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Embedded name: %s",r->embedded_name[0]?r->embedded_name:"(unavailable)");yy+=lh;
+  }
+  textf(x+20,y+h-36,0xFFB8C6D3u,g_body_scale,"No icon.sys / .icn entries; no files created or converted.");
+  return;
+ }
+
  int x=g_margin+20,y=g_title_y+55,w=(int)g_width-g_margin*2-40,h=(int)g_height-y-g_margin-35;/* Opaque details surface: never blend browser rows, preview or HUD through text. */
  round_rect(x,y,w,h,10,0xFF0A1622u);rect(x+3,y+3,w-6,3,0xFF2CCBFFu);
  textf(x+18,y+14,0xFFFFFFFFu,g_title_scale,"PSU DETAILS   PAGE %d/%d",g_psu_metadata_page+1,psu_metadata_page_count());int yy=y+55,lh=scale125(10*g_body_scale)+10;
@@ -4048,7 +4097,7 @@ static void rename_cursor_right(){size_t n=strlen(g_rename_text);if(g_rename_cur
 static void rename_cursor_home(){if(g_rename_cursor){g_rename_cursor=0;rename_text_changed();}}
 static void rename_cursor_end(){size_t n=strlen(g_rename_text);if(g_rename_cursor!=n){g_rename_cursor=n;rename_text_changed();}}
 static void commit_rename(){
- if(g_foreign_archive_view){snprintf(status_line,sizeof(status_line),"Read-only archive view: rename disabled");g_rename_active=0;return;}
+ if(g_xpo_native_view||g_foreign_archive_view){snprintf(status_line,sizeof(status_line),"Read-only archive view: rename disabled");g_rename_active=0;return;}
  if(g_keyboard_purpose==KB_NEW_PSU_FILENAME){commit_blank_psu_filename_step();return;}
  if(g_keyboard_purpose==KB_NEW_PSU_FOLDER){commit_blank_psu_folder_step();return;}
  if(g_keyboard_purpose==KB_NEW_PSU_GAME_NAME){commit_blank_psu_game_name_step();return;}
@@ -5526,7 +5575,6 @@ static int open_foreign_archive(const char *input,int is_max){
  rc=0;
  done:if(f)fclose(f);free(data);return rc;
 }
-#include "ps2_xpo_v1.h"
 /* Stage49: use the same read-only PSU-shaped viewer as MAX/CBS. */
 static int open_sharkport_archive(const char *input){
  FILE *f=NULL;unsigned char *data=NULL;long sz;int rc=-1;char tmp[PATHSZ];
@@ -5577,37 +5625,30 @@ static int inspect_sharkport_archive(const char *path,char *title,size_t titleca
 static void do_cross(){if(item_count<=0||archive_mode)return;char p[PATHSZ];join(p,sizeof(p),cwd,items[selected].name);
  if(!items[selected].is_dir && (endswith(items[selected].name,".sps") || endswith(items[selected].name,".xps") || endswith(items[selected].name,".xpo"))){
   if(endswith(items[selected].name,".xpo")){
-   FILE *xf=fopen(p,"rb");ps2_xpo_v1_info *info=(ps2_xpo_v1_info*)malloc(sizeof(ps2_xpo_v1_info));int probe=-1, exported=0, err=0;
-   unsigned char *xb=NULL;long xn=0;
-   if(xf && info && !fseek(xf,0,SEEK_END)){
-    xn=ftell(xf);
-    if(xn>0 && xn<=20*1024*1024 && !fseek(xf,0,SEEK_SET)){
-     xb=(unsigned char*)malloc((size_t)xn);
-     if(xb && fread(xb,1,(size_t)xn,xf)==(size_t)xn)probe=ps2_xpo_v1_probe(xb,(size_t)xn,info);
-    }
+   FILE *f=fopen(p,"rb");long n=0;int rc=-1;
+   unsigned char *data=NULL;ps2_xpo_v1_info *info=NULL;
+   if(f && !fseek(f,0,SEEK_END) && (n=ftell(f))>0 &&
+      n<=20*1024*1024 && !fseek(f,0,SEEK_SET)){
+    data=(unsigned char*)malloc((size_t)n);
+    info=(ps2_xpo_v1_info*)malloc(sizeof(*info));
+    if(data && info && fread(data,1,(size_t)n,f)==(size_t)n)
+     rc=ps2_xpo_v1_probe(data,(size_t)n,info);
    }
-   if(xf)fclose(xf);
-   if(!probe && xb){
-    /* Raw record export only: NEVER represent these records as PS2 memory-card files. */
-    char outdir[PATHSZ];
-    int n=snprintf(outdir,sizeof(outdir),"%s.xpo_records",p);
-    if(n<=0 || (size_t)n>=sizeof(outdir))err=-10;
-    else if(mkdir(outdir,0700)!=0 && !path_exists_dir(outdir))err=-11;
-    if(!err){
-     for(unsigned i=0;i<info->record_count;i++){
-      char output[PATHSZ];
-      int m=snprintf(output,sizeof(output),"%s/record_%03u.bin",outdir,i);
-      if(m<=0 || (size_t)m>=sizeof(output)){err=-12;break;}
-      int result=ps2_xpo_v1_export_record(xb,(size_t)xn,info,i,output);
-      if(result){err=result;break;}
-      exported++;
-     }
-    }
-    if(!err)snprintf(status_line,sizeof(status_line),"X-Port v1: exported %d raw records to .xpo_records folder (NOT PSU)",exported);
-    else snprintf(status_line,sizeof(status_line),"X-Port v1: exported %d records; write error %d",exported,err);
-    invalidate_dir_cache(cwd);refresh_fs();refresh_fs_metadata_now();
-   }else snprintf(status_line,sizeof(status_line),"X-Port v1: invalid structure or memory error (%d)",probe);
-   free(xb);free(info);g_ui_dirty=1;return;
+   if(f)fclose(f);
+   if(rc==0){
+    close_xpo_native();close_foreign_view();
+    g_xpo_native_data=data;g_xpo_native_size=(size_t)n;
+    g_xpo_native_info=info;g_xpo_native_view=1;
+    snprintf(archive_path,sizeof(archive_path),"%s",p);
+    archive_mode=1;selected=top_index=0;
+    clear_icn_cache();free_preview();clear_iconsys_icn_refs();
+    refresh_xpo_native();export_target_active=0;
+    snprintf(status_line,sizeof(status_line),"X-Port v1: %u original records (read-only)",info->record_count);
+   }else{
+    free(data);free(info);
+    snprintf(status_line,sizeof(status_line),"X-Port v1: invalid archive (%d)",rc);
+   }
+   g_ui_dirty=1;return;
   }
   int rc=open_sharkport_archive(p);
   if(rc)snprintf(status_line,sizeof(status_line),"X-Port/SharkPort: unsupported or invalid archive (%d)",rc);
@@ -5623,7 +5664,7 @@ static void do_cross(){if(item_count<=0||archive_mode)return;char p[PATHSZ];join
  if(!items[selected].is_dir&&endswith(items[selected].name,".part")){char url[1024];if(downloader_load_resume_url(p,url,sizeof(url))==0){snprintf(status_line,sizeof(status_line),"Resuming %s",items[selected].name);download_url_to_fakeusb(url);invalidate_dir_cache(cwd);refresh_fs();refresh_fs_metadata_now();g_folder_dirty=1;g_ui_dirty=1;}else{g_options_active=1;g_options_selected=2;start_url_keyboard();snprintf(status_line,sizeof(status_line),"Enter original URL to resume selected .part file");}return;}
  if(items[selected].is_dir){strncpy(cwd,p,sizeof(cwd)-1);cwd[sizeof(cwd)-1]=0;selected=top_index=0;refresh_fs();g_folder_dirty=1;g_ui_dirty=0;}else if(endswith(items[selected].name,".psu")){strncpy(archive_path,p,sizeof(archive_path)-1);archive_path[sizeof(archive_path)-1]=0;clear_icn_cache();free_preview();g_icon_preload_archive[0]=0;g_icon_preload_cursor=g_icon_preload_count=0;archive_mode=1;selected=top_index=0;refresh_psu();export_target_active=(item_count>0);ensure_preview_current();}}
 static void do_circle(){
- if(archive_mode){archive_mode=0;close_foreign_view();archive_path[0]=0;export_target_active=0;selected=top_index=0;refresh_fs();return;}
+ if(archive_mode){archive_mode=0;close_xpo_native();close_foreign_view();archive_path[0]=0;export_target_active=0;selected=top_index=0;refresh_fs();return;}
  /* Apollo SAVEDATA is normally the protected HDD logical root. If it is truly empty,
     allow the user to back out to /dev_hdd0 so they are not trapped in an empty fakeusb tree. */
  if(!strcmp(cwd,g_apollo_savedata_path)){
@@ -5693,7 +5734,7 @@ static void do_square(){if(item_count<=0)return;
   snprintf(status_line,sizeof(status_line),rc==0?"Experimental PSU written beside XPO (game compatibility NOT verified)":"Experimental XPO conversion failed (%d)",rc);
   invalidate_dir_cache(cwd);refresh_fs();g_ui_dirty=1;return;
  }
-if(archive_mode){if(items[selected].is_dir)return;export_target_active=1;char out[PATHSZ];join(out,sizeof(out),cwd,items[selected].name);int rc=psu_extract_one(archive_path,items[selected].name,out);snprintf(status_line,sizeof(status_line),rc?"Export failed: %s":"Exported %s",rc?psu_strerror(rc):items[selected].name);return;}if(items[selected].is_dir)return;char p[PATHSZ];join(p,sizeof(p),cwd,items[selected].name);strncpy(clipboard,p,sizeof(clipboard)-1);snprintf(status_line,sizeof(status_line),"Copied for inject: %s",items[selected].name);}
+if(archive_mode){if(g_xpo_native_view){strcpy(status_line,"XPO native view: no automatic extraction");return;}if(items[selected].is_dir)return;export_target_active=1;char out[PATHSZ];join(out,sizeof(out),cwd,items[selected].name);int rc=psu_extract_one(archive_path,items[selected].name,out);snprintf(status_line,sizeof(status_line),rc?"Export failed: %s":"Exported %s",rc?psu_strerror(rc):items[selected].name);return;}if(items[selected].is_dir)return;char p[PATHSZ];join(p,sizeof(p),cwd,items[selected].name);strncpy(clipboard,p,sizeof(clipboard)-1);snprintf(status_line,sizeof(status_line),"Copied for inject: %s",items[selected].name);}
 static void refresh_after_zip(){invalidate_dir_cache(cwd);refresh_fs();g_folder_dirty=1;g_ui_dirty=1;}
 static void run_zip_extract(int mode){
  char zip[PATHSZ],dest[PATHSZ];snprintf(zip,sizeof(zip),"%s",g_zip_confirm_archive);snprintf(dest,sizeof(dest),"%s",g_zip_confirm_destination);
@@ -5752,7 +5793,7 @@ static void convert_foreign_view_to_psu(){
  g_ui_dirty=1;
 }
 static void do_export_whole_psu(){
- if(archive_mode){if(g_foreign_archive_view)convert_foreign_view_to_psu();else strcpy(status_line,"Close PSU before whole-archive export");return;}
+ if(archive_mode){if(g_xpo_native_view){strcpy(status_line,"XPO native view: export requires separate action");return;}if(g_foreign_archive_view)convert_foreign_view_to_psu();else strcpy(status_line,"Close PSU before whole-archive export");return;}
  if(item_count<=0||items[selected].is_dir){strcpy(status_line,"Select a .psu or .zip file first");return;}
  if(endswith(items[selected].name,".zip")){begin_zip_extract();return;}
  if(!endswith(items[selected].name,".psu")){strcpy(status_line,"Select a .psu or .zip file first");return;}
@@ -5765,7 +5806,7 @@ static void do_triangle(){
   g_xpo_icon_mode=1;
   snprintf(status_line,sizeof(status_line),"Generated title icon selected: press Square to confirm XPO conversion");g_ui_dirty=1;return;
  }
- if(archive_mode){if(g_foreign_archive_view){strcpy(status_line,"Read-only archive view: injection disabled");return;}if(!clipboard[0]){success_frames=0;strcpy(status_line,"Copy a file first with Square");return;}const char *name=base_name(clipboard);int rc=psu_add_or_replace(archive_path,clipboard,name);if(rc){success_frames=0;snprintf(status_line,sizeof(status_line),"Inject failed: %s",psu_strerror(rc));}else{snprintf(status_line,sizeof(status_line),"Injected %s",name);snprintf(success_line,sizeof(success_line),"SUCCESS: Imported / injected %s",name);success_frames=360;}free_preview();clear_icn_cache();refresh_psu();return;}}
+ if(archive_mode){if(g_xpo_native_view||g_foreign_archive_view){strcpy(status_line,"Read-only archive view: injection disabled");return;}if(!clipboard[0]){success_frames=0;strcpy(status_line,"Copy a file first with Square");return;}const char *name=base_name(clipboard);int rc=psu_add_or_replace(archive_path,clipboard,name);if(rc){success_frames=0;snprintf(status_line,sizeof(status_line),"Inject failed: %s",psu_strerror(rc));}else{snprintf(status_line,sizeof(status_line),"Injected %s",name);snprintf(success_line,sizeof(success_line),"SUCCESS: Imported / injected %s",name);success_frames=360;}free_preview();clear_icn_cache();refresh_psu();return;}}
 static int remove_tree(const char *path){
  struct stat st;if(stat(path,&st)!=0)return -1;if(!S_ISDIR(st.st_mode))return unlink(path);
  DIR*d=opendir(path);if(!d)return -1;struct dirent*de;int rc=0;
@@ -5802,7 +5843,7 @@ static void do_folder_psu(){
  int rc=psu_create_from_dir(target,out,clean);snprintf(status_line,sizeof(status_line),rc?"PSU create failed: %s":"Created %s",rc?psu_strerror(rc):base_name(out));invalidate_dir_cache(cwd);refresh_fs();
 }
 static void begin_delete_confirmation(){
- if(g_foreign_archive_view){snprintf(status_line,sizeof(status_line),"Read-only archive view: deletion disabled");return;}
+ if(g_xpo_native_view||g_foreign_archive_view){snprintf(status_line,sizeof(status_line),"Read-only archive view: deletion disabled");return;}
  if(item_count<=0||selected<0||selected>=item_count)return;
  if(archive_mode&&items[selected].is_dir){snprintf(status_line,sizeof(status_line),"Cannot delete PSU directory entry");return;}
  g_delete_confirm_active=1;
@@ -6075,5 +6116,5 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
   if(press&B_CIRCLE){if(g_keyboard_purpose==KB_DOWNLOAD_URL){g_rename_active=0;g_downloader_active=0;g_keyboard_purpose=KB_RENAME;{g_options_active=1;g_options_selected=2;}g_ui_dirty=1;snprintf(status_line,sizeof(status_line),"Downloader cancelled");}else cancel_rename();}
   draw();continue;
  }
- u16 navpress=press&(B_UP|B_DOWN|B_L1|B_R1);int nav_old_selected=selected;int nav_old_icn=(archive_mode&&item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&preview_entry_is_standard_icn(items[selected].name));if(navpress&&!archive_mode){g_list_dirty=0;g_ui_dirty=1;}if(press&~(B_UP|B_DOWN|B_L1|B_R1))g_ui_dirty=1;if(press&B_UP){if(selected>0)selected--;}if(press&B_DOWN){if(selected+1<item_count)selected++;}if(press&B_L1){selected=(selected>10)?selected-10:0;}if(press&B_R1){if(item_count>0){selected+=10;if(selected>=item_count)selected=item_count-1;}}if(navpress&&archive_mode&&selected!=nav_old_selected){int nav_new_icn=(item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&preview_entry_is_standard_icn(items[selected].name));export_target_active=1;/* Strict PSU fast path: non-ICN -> non-ICN must not enter preview/cache code at all. */if(nav_old_icn||nav_new_icn){ensure_preview_current();g_ui_dirty=1;}else{g_list_dirty=1;}}if(press&B_L2)do_cancel();if(press&B_R2)do_blank_psu();if(press&B_R3){if(archive_mode){if(g_foreign_archive_view)strcpy(status_line,"Read-only archive view: rename disabled");else begin_rename();}else do_folder_psu();}if(press&B_L3)do_export_whole_psu();if(press&B_LEFT)switch_device(-1);if(press&B_RIGHT)switch_device(1);if(press&B_CROSS){if(archive_mode){psu_metadata_cache_load();g_details_base_ready=0;g_psu_metadata_active=1;g_psu_metadata_page=0;g_ui_dirty=1;}else do_cross();}if(press&B_CIRCLE)do_circle();if(press&B_SQUARE)do_square();if(press&B_TRIANGLE){if(archive_mode)do_triangle();else begin_rename();}if(press&B_SELECT)do_select();if(press&B_START){g_options_active=1;g_options_selected=0;g_ui_dirty=1;}service_directory_watch();service_lazy_file_metadata();service_icon_preload();draw();}ioPadEnd();return 0;}
+ u16 navpress=press&(B_UP|B_DOWN|B_L1|B_R1);int nav_old_selected=selected;int nav_old_icn=(archive_mode&&item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&preview_entry_is_standard_icn(items[selected].name));if(navpress&&!archive_mode){g_list_dirty=0;g_ui_dirty=1;}if(press&~(B_UP|B_DOWN|B_L1|B_R1))g_ui_dirty=1;if(press&B_UP){if(selected>0)selected--;}if(press&B_DOWN){if(selected+1<item_count)selected++;}if(press&B_L1){selected=(selected>10)?selected-10:0;}if(press&B_R1){if(item_count>0){selected+=10;if(selected>=item_count)selected=item_count-1;}}if(navpress&&archive_mode&&selected!=nav_old_selected){int nav_new_icn=(item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&preview_entry_is_standard_icn(items[selected].name));export_target_active=1;/* Strict PSU fast path: non-ICN -> non-ICN must not enter preview/cache code at all. */if(nav_old_icn||nav_new_icn){ensure_preview_current();g_ui_dirty=1;}else{g_list_dirty=1;}}if(press&B_L2)do_cancel();if(press&B_R2)do_blank_psu();if(press&B_R3){if(archive_mode){if(g_xpo_native_view||g_foreign_archive_view)strcpy(status_line,"Read-only archive view: rename disabled");else begin_rename();}else do_folder_psu();}if(press&B_L3)do_export_whole_psu();if(press&B_LEFT)switch_device(-1);if(press&B_RIGHT)switch_device(1);if(press&B_CROSS){if(archive_mode){if(!g_xpo_native_view)psu_metadata_cache_load();g_details_base_ready=0;g_psu_metadata_active=1;g_psu_metadata_page=0;g_ui_dirty=1;}else do_cross();}if(press&B_CIRCLE)do_circle();if(press&B_SQUARE)do_square();if(press&B_TRIANGLE){if(archive_mode)do_triangle();else begin_rename();}if(press&B_SELECT)do_select();if(press&B_START){g_options_active=1;g_options_selected=0;g_ui_dirty=1;}service_directory_watch();service_lazy_file_metadata();service_icon_preload();draw();}ioPadEnd();return 0;}
 
