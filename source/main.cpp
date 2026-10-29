@@ -3637,7 +3637,7 @@ static void draw(){
  rsx_draw_background();
  perf_t1=fps_now_us(); perf_avg(&g_perf_bg_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[1]=phase5c_cmd_off(); g_5c_stage=1;
  g_rsx_ui_overlay=1;
- const char *title="PS2 PSU Manager v1.63";
+ const char *title="PS2 PSU Manager v1.64";
  int title_h=scale125(12*g_title_scale)+30;
  /* modern desktop-style app bar */
  int app_x=g_margin-14, app_y=g_title_y-12, app_w=(int)g_width-g_margin*2+28;
