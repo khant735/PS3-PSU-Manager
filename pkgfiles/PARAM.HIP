@@ -1,9 +1,9 @@
-PS2 .PSU SAVE MANAGER v1.63T
+PS2 .PSU SAVE MANAGER v1.64
 
 CONTROLS
 FILE BROWSER
 Up/Down  Select item
-X  Open folder/PSU; resume .part
+X  Open folder or supported save archive
 Circle  Back
 Left/Right  Switch HDD / USB
 L1/R1  Move 10 items
@@ -16,7 +16,7 @@ R2  Create blank PSU
 R3  Create PSU from folder
 Start  Open Options
 
-INSIDE PSU
+INSIDE PSU (EDITABLE ARCHIVE)
 Up/Down  Select entry
 X  Show PSU details
 Circle  Close PSU
@@ -28,6 +28,17 @@ Triangle  Inject copied file
 Select  Delete selected entry
 R3  Rename selected entry
 Start  Open Options
+
+INSIDE OTHER SAVE ARCHIVES (READ ONLY)
+PSU, CBS, MAX, XPO, XPS, SPS supported
+Up/Down  Select entry
+X  Show archive details
+Circle  Close archive
+L1/R1  Move 10 entries
+Square  Export selected entry (where supported)
+L3  Convert to PSU (where supported)
+Start  Open Options
+No injection, renaming or deletion in non-PSU archives.
 
 OPTIONS
 Up/Down  Select option
@@ -78,6 +89,30 @@ ZIP supports STORE and DEFLATE archives
 X  Replace existing files; Circle  Cancel
 
 UPDATE HISTORY
+
+v1.64 Stable - Expanded PS2 Save Formats
+Support browsing PSU, CodeBreaker CBS, Action
+Replay MAX, X-Port XPO and XPS, and SharkPort
+SPS save archives. Non-PSU archive browsing is
+read-only; injection is allowed only in PSU.
+Browse XPO records with their original filenames
+without automatically extracting them. Add
+selected-record export and separate XPO-to-PSU
+conversion; compatibility remains game-dependent.
+Add multipage XPO Details with original record
+metadata, sizes, offsets, attributes and names.
+Expand Save Information using PS2 game database
+lookups: game/disc serial, inferred region,
+regional release date, date precision and source
+when available. Missing information is labelled.
+Add preliminary GameFAQs save-list discovery and
+download integration, including archived pages
+through the Wayback Machine where supported.
+GameFAQs availability and individual downloads
+remain experimental and may vary by source.
+Update the in-app title, XMB version information
+and controller legends for supported formats.
+
 
 v1.63 XMB history wrapping and logo
 Wrap long XMB Update History lines at word
