@@ -3357,6 +3357,7 @@ static void draw_psu_metadata_modal(){
    textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Disc serial inferred from save folder; not independently verified.");yy+=lh;
    textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Read-only details. No extraction or conversion performed.");
   }
+  textf(x+20,y+h-32,0xFF8FE7FFu,g_body_scale,"L1 / R1: Previous / Next page     Circle: Back");
   return;
  }
 
@@ -5764,7 +5765,44 @@ static const char *xpo_title_for_dir(const char *dir){
  if(strstr(dir,"SLES-50072"))return "Street Fighter EX3";
  return NULL;
 }
+/* XPO actions are explicit; opening and viewing never write to disk. */
+static void xpo_export_selected(){
+ if(!g_xpo_native_view||!g_xpo_native_info||selected<0||(unsigned)selected>=g_xpo_native_info->record_count)return;
+ const ps2_xpo_v1_record *r=&g_xpo_native_info->records[selected];
+ if(!r->name[0]||strchr(r->name,'/')||strchr(r->name,'\\')||!strcmp(r->name,".")||!strcmp(r->name,"..")){
+  strcpy(status_line,"XPO export failed: unsafe filename");return;
+ }
+ char dest[PATHSZ];int rc=-1;
+ for(int i=0;i<1000;i++){
+  int n=i?snprintf(dest,sizeof(dest),"%s/%s_%d",cwd,r->name,i):snprintf(dest,sizeof(dest),"%s/%s",cwd,r->name);
+  if(n<=0||(size_t)n>=sizeof(dest)){strcpy(status_line,"XPO export path too long");return;}
+  struct stat st;if(stat(dest,&st)==0)continue;
+  rc=ps2_xpo_v1_export_record(g_xpo_native_data,g_xpo_native_size,g_xpo_native_info,(unsigned)selected,dest);
+  break;
+ }
+ if(rc==0){snprintf(status_line,sizeof(status_line),"Exported %s",base_name(dest));invalidate_dir_cache(cwd);}
+ else snprintf(status_line,sizeof(status_line),"XPO single-file export failed (%d)",rc);
+ g_ui_dirty=1;
+}
+static void xpo_convert_to_psu(){
+ if(!g_xpo_native_view||!g_xpo_native_info)return;
+ char stem[256],dest[PATHSZ];snprintf(stem,sizeof(stem),"%s",base_name(archive_path));
+ char *dot=strrchr(stem,'.');if(dot&&(!strcasecmp(dot,".xpo"))) *dot=0;
+ if(!stem[0]){strcpy(status_line,"XPO conversion: invalid source name");return;}
+ int rc=-1;
+ for(int i=0;i<1000;i++){
+  int n=i?snprintf(dest,sizeof(dest),"%s/%s_%d.psu",cwd,stem,i):snprintf(dest,sizeof(dest),"%s/%s.psu",cwd,stem);
+  if(n<=0||(size_t)n>=sizeof(dest)){strcpy(status_line,"XPO conversion path too long");return;}
+  struct stat st;if(stat(dest,&st)==0)continue;
+  rc=ps2_xpo_v1_write_candidate_psu(g_xpo_native_data,g_xpo_native_size,g_xpo_native_info,dest);
+  break;
+ }
+ if(rc==0){snprintf(status_line,sizeof(status_line),"Created %s (XPO->PSU, compatibility unverified)",base_name(dest));invalidate_dir_cache(cwd);}
+ else snprintf(status_line,sizeof(status_line),"XPO to PSU conversion failed (%d)",rc);
+ g_ui_dirty=1;
+}
 static void do_square(){if(item_count<=0)return;
+ if(g_xpo_native_view){xpo_export_selected();return;}
  if(!archive_mode && !items[selected].is_dir && endswith(items[selected].name,".xpo")){
   char p[PATHSZ];join(p,sizeof(p),cwd,items[selected].name);
   if(strcmp(g_xpo_candidate_pending,p)!=0){snprintf(g_xpo_candidate_pending,sizeof(g_xpo_candidate_pending),"%s",p);g_xpo_icon_mode=0;snprintf(status_line,sizeof(status_line),"XPO->PSU: Square again for ORIGINAL; Triangle for generated title icon");g_ui_dirty=1;return;}
@@ -5840,7 +5878,7 @@ static void convert_foreign_view_to_psu(){
  g_ui_dirty=1;
 }
 static void do_export_whole_psu(){
- if(archive_mode){if(g_xpo_native_view){strcpy(status_line,"XPO native view: export requires separate action");return;}if(g_foreign_archive_view)convert_foreign_view_to_psu();else strcpy(status_line,"Close PSU before whole-archive export");return;}
+ if(archive_mode){if(g_xpo_native_view){xpo_convert_to_psu();return;}if(g_foreign_archive_view)convert_foreign_view_to_psu();else strcpy(status_line,"Close PSU before whole-archive export");return;}
  if(item_count<=0||items[selected].is_dir){strcpy(status_line,"Select a .psu or .zip file first");return;}
  if(endswith(items[selected].name,".zip")){begin_zip_extract();return;}
  if(!endswith(items[selected].name,".psu")){strcpy(status_line,"Select a .psu or .zip file first");return;}
