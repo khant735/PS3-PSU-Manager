@@ -6,7 +6,7 @@ A PlayStation 3 homebrew application for managing PlayStation 2 memory-card save
 
 ## Downloads
 
-### Stable releases — recommended for regular use
+### Stable releases — v1.64
 
 **[Download latest stable release](https://github.com/khant735/PS3-PSU-Manager/releases/latest)**
 
@@ -24,9 +24,9 @@ Each development build has a unique `dev-v?.??-build.RUN.ATTEMPT` tag and its ow
 - PSU extraction to folders, PSU creation from folders and blank PSU templates.
 - PS2 `.icn` save-icon previews, with experimental model/texture handling.
 - Virtual keyboard for renaming files and archive entries.
-- Additional save formats including XPO, MAX and CBS under development; not all variants are fully convertible.
+- Read-only browsing of PSU, CBS, MAX, XPO, XPS and SPS save archives. XPO supports original-record listing, individual-file export and explicit experimental PSU conversion; other conversions vary by format.
 - HTTPS file downloader with progress, pause/resume, partial-file retention and multi-connection diagnostics.
-- Experimental homebrew and save catalogues (PS2Wiki/Filen, PS2HomebrewStore and GameFAQs), game-title metadata and PS2IODB icon lookup.
+- Experimental homebrew and save catalogues (PS2Wiki/Filen, PS2HomebrewStore and GameFAQs, including preliminary Wayback Machine archive discovery), game-title metadata, regional release-date lookups and PS2IODB icon lookup.
 - GameFAQs Saves: local catalogue, game/save ID parsing and Square-triggered listing scans and individual-save-page HTTPS retrieval. **Not** a complete live GameFAQs catalogue.
 - RSX/Tiny3D interface, options, FPS display and exit-to-XMB action.
 
