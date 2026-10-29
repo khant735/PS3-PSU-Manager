@@ -3703,8 +3703,8 @@ static void draw(){
  static const legend_entry_t legend_psu[]={
   {"X","DETAILS"},{"O","CLOSE PSU"},{"LEFT/RIGHT","DEVICE"},{"L1/R1","FAST SCROLLING"},{"L2","CANCEL"},{"SQUARE","EXPORT"},{"TRIANGLE","INJECT"},{"R3","RENAME"},{"SELECT","DELETE"},{"START","OPTIONS"}
  };
- const legend_entry_t *legend=archive_mode?(g_foreign_archive_view?legend_foreign:legend_psu):legend_fs;
- int legend_count=archive_mode?(g_foreign_archive_view?(int)(sizeof(legend_foreign)/sizeof(legend_foreign[0])):(int)(sizeof(legend_psu)/sizeof(legend_psu[0]))):(int)(sizeof(legend_fs)/sizeof(legend_fs[0]));
+ const legend_entry_t *legend=archive_mode?((g_foreign_archive_view||g_xpo_native_view)?legend_foreign:legend_psu):legend_fs;
+ int legend_count=archive_mode?((g_foreign_archive_view||g_xpo_native_view)?(int)(sizeof(legend_foreign)/sizeof(legend_foreign[0])):(int)(sizeof(legend_psu)/sizeof(legend_psu[0]))):(int)(sizeof(legend_fs)/sizeof(legend_fs[0]));
  int legend_lines=measure_control_legend_lines(legend,legend_count,(int)g_width-g_margin*2-12,g_help_scale);
  int legend_line_h=legend_line_height(g_help_scale);
  int legend_bottom_pad=14; /* breathing room below final control row */
@@ -5965,7 +5965,7 @@ static void confirm_delete(){
  g_delete_confirm_active=0;g_delete_confirm_name[0]=0;
  invalidate_dir_cache(cwd);refresh_fs();g_ui_dirty=1;
 }
-static void do_select(){if(g_foreign_archive_view){strcpy(status_line,"Read-only archive view: deletion disabled");return;}begin_delete_confirmation();}
+static void do_select(){if(g_foreign_archive_view||g_xpo_native_view){strcpy(status_line,"Read-only archive view: deletion disabled");return;}begin_delete_confirmation();}
 static void do_cancel(){int had_clipboard=clipboard[0]!=0;int had_success=success_frames>0;int had_export=archive_mode&&export_target_active;clipboard[0]=0;export_target_active=0;success_frames=0;success_line[0]=0;if(had_clipboard&&had_export&&had_success)strcpy(status_line,"Cancelled staged copy/injection + export target; dismissed message");else if(had_clipboard&&had_export)strcpy(status_line,"Cancelled staged copy/injection and export target");else if(had_clipboard&&had_success)strcpy(status_line,"Cancelled staged copy/injection and dismissed message");else if(had_export&&had_success)strcpy(status_line,"Cancelled staged export target and dismissed message");else if(had_clipboard)strcpy(status_line,"Cancelled staged copy/injection");else if(had_export)strcpy(status_line,"Cancelled staged export target");else if(had_success)strcpy(status_line,"Dismissed current message");else strcpy(status_line,"Previous action cleared");}
 
 
