@@ -3285,31 +3285,78 @@ static const char *icon_diag_origin(unsigned long geometry,unsigned long texture
 static void icon_diag_name(char out[65],const unsigned char *p){memcpy(out,p,64);out[64]=0;}
 static int sharkport_details_active(){return g_foreign_archive_view &&
  (endswith(g_foreign_source_path,".sps")||endswith(g_foreign_source_path,".xps")||endswith(g_foreign_source_path,".xpo"));}
-static int psu_metadata_page_count(){if(g_xpo_native_view)return 1;if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 5+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
+static int psu_metadata_page_count(){if(g_xpo_native_view)return 3;if(!g_psu_meta_cache.valid)psu_metadata_cache_load();return 5+g_psu_meta_cache.entry_count+(sharkport_details_active()?1:0);}
 static void sjis_title_slice_ascii(const unsigned char*src,size_t begin,size_t end,char*out,size_t cap){if(begin>end){size_t t=begin;begin=end;end=t;}if(end>68)end=68;ps2_sjis_title_ascii(src+begin,end-begin,out,cap);}
 static void draw_psu_metadata_modal(){
  if(g_xpo_native_view){
   int x=g_margin+20,y=g_title_y+55,w=(int)g_width-g_margin*2-40,h=(int)g_height-y-g_margin-35;
   round_rect(x,y,w,h,10,0xFF0A1622u);rect(x+3,y+3,w-6,3,0xFF2CCBFFu);
-  int yy=y+20,lh=scale125(10*g_body_scale)+10;
-  textf(x+20,yy,0xFFFFFFFFu,g_title_scale,"X-PORT V1 DETAILS (READ ONLY)");yy+=lh+20;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Archive: %s",base_name(archive_path));yy+=lh;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Archive size: %u bytes",(unsigned)g_xpo_native_size);yy+=lh;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Record count: %u",g_xpo_native_info->record_count);yy+=lh;
-  textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Total payload: %u bytes",(unsigned)g_xpo_native_info->payload_bytes);yy+=lh;
-  if(item_count>0 && selected>=0 && (unsigned)selected<g_xpo_native_info->record_count){
-   const ps2_xpo_v1_record *r=&g_xpo_native_info->records[selected];
-   yy+=lh;
-   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SELECTED RECORD");yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Filename: %s",r->name);yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Size: %u bytes",(unsigned)r->payload_size);yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Payload offset: 0x%08X",(unsigned)r->payload_offset);yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Record header offset: 0x%08X",(unsigned)r->header_offset);yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Attributes (raw): 0x%04X",r->attr_be);yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Header words: %08X %08X",r->metadata_word_46,r->metadata_word_4a);yy+=lh;
-   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Embedded name: %s",r->embedded_name[0]?r->embedded_name:"(unavailable)");yy+=lh;
+  textf(x+18,y+14,0xFFFFFFFFu,g_title_scale,"XPO DETAILS   PAGE %d/3",g_psu_metadata_page+1);
+  int yy=y+55,lh=scale125(10*g_body_scale)+10;
+  const ps2_xpo_v1_record *r=(selected>=0 && (unsigned)selected<g_xpo_native_info->record_count)?&g_xpo_native_info->records[selected]:NULL;
+  if(g_psu_metadata_page==0){
+   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"X-PORT V1 ARCHIVE METADATA");yy+=lh+4;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Archive: %s",base_name(archive_path));yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Archive size: %u bytes",(unsigned)g_xpo_native_size);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Record count: %u",g_xpo_native_info->record_count);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Total record payload: %u bytes",(unsigned)g_xpo_native_info->payload_bytes);yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Format: X-Port v1 (read only)");yy+=lh;
+   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Only actual archive records are listed. No icon.sys or .icn files generated.");
+  }else if(g_psu_metadata_page==1){
+   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SELECTED XPO RECORD METADATA");yy+=lh+4;
+   if(r){
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Filename: %s",r->name);yy+=lh;
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Size: %u bytes",(unsigned)r->payload_size);yy+=lh;
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Payload offset: 0x%08X",(unsigned)r->payload_offset);yy+=lh;
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Record header offset: 0x%08X",(unsigned)r->header_offset);yy+=lh;
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Attributes (raw): 0x%04X",r->attr_be);yy+=lh;
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Header words: %08X %08X",r->metadata_word_46,r->metadata_word_4a);yy+=lh;
+    textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Embedded name: %s",r->embedded_name[0]?r->embedded_name:"(unavailable)");yy+=lh;
+   }else textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"No record selected.");
+  }else{
+   textf(x+20,yy,0xFF8FE7FFu,g_body_scale,"SAVE INFORMATION");yy+=lh+4;
+   const char *folder=g_xpo_native_info->record_count?g_xpo_native_info->records[0].name:"";
+   char serial[11]={0},db_title[512]={0};
+   int candidate=ps2_game_extract_serial(folder,serial),matched=0;
+   if(candidate){
+    const char *paths[]={"/dev_hdd0/game/PSU000001/USRDIR/PS2_GAME_TITLES.tsv",
+     "/dev_hdd0/tmp/fakeusb/PS2/SAVEDATA/PS2_GAME_TITLES.tsv",NULL};
+    for(int i=0;paths[i];i++)if(ps2_game_title_lookup(paths[i],folder,db_title,sizeof(db_title))==1){matched=1;break;}
+   }
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Game / save title: %s",matched?db_title:"Not verified");yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save description: Not available");yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save type: Imported PS2 X-Port archive");yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Source file: %s",base_name(archive_path));yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Save folder ID: %s",folder[0]?folder:"Not available");yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Game / disc serial: %s",candidate?serial:"Not available");yy+=lh;
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Database game match: %s",matched?db_title:"Not verified");yy+=lh;
+   const char *region="Not verified";
+   if(matched){
+    if(!strncmp(serial,"SCES-",5)||!strncmp(serial,"SLES-",5))region="Europe (inferred)";
+    else if(!strncmp(serial,"SCUS-",5)||!strncmp(serial,"SLUS-",5))region="North America (inferred)";
+    else if(!strncmp(serial,"SCPS-",5)||!strncmp(serial,"SLPS-",5)||!strncmp(serial,"SLPM-",5))region="Japan (inferred)";
+   }
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Region: %s",region);yy+=lh;
+   char date[24]={0},precision[16]={0},source[96]={0};int found=0;
+   if(candidate&&matched){
+    const char *paths[]={"/dev_hdd0/game/PSU000001/USRDIR/PS2_GAME_TITLES.releases.tsv",
+     "/dev_hdd0/tmp/fakeusb/PS2/SAVEDATA/PS2_GAME_TITLES.releases.tsv",NULL};
+    for(int i=0;paths[i];i++)if(ps2_game_release_lookup(paths[i],serial,date,sizeof(date),precision,sizeof(precision),source,sizeof(source))==1){found=1;break;}
+   }
+   textf(x+20,yy,0xFFFFFFFFu,g_body_scale,"Regional release date: %s",found?date:"Not available");yy+=lh;
+   if(found){
+    const char *label=source;
+    if(strstr(source,"niemasd/GameDB-PS2"))label="GameDB-PS2";
+    else if(strstr(source,"gran-turismo.com"))label="Gran Turismo official";
+    else if(strstr(source,"wiki.pcsx2.net"))label="PCSX2 Wiki";
+    else if(strstr(source,"psxdatacenter.com"))label="PSX DataCenter";
+    else if(strstr(source,"github.com/"))label="GitHub source";
+    else if(strstr(source,"://"))label="External source";
+    textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Date precision: %s  Source: %s",precision,label);yy+=lh;
+   }
+   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Disc serial inferred from save folder; not independently verified.");yy+=lh;
+   textf(x+20,yy,0xFFB8C6D3u,g_body_scale,"Read-only details. No extraction or conversion performed.");
   }
-  textf(x+20,y+h-36,0xFFB8C6D3u,g_body_scale,"No icon.sys / .icn entries; no files created or converted.");
   return;
  }
 
