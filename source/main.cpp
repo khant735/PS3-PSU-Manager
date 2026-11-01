@@ -5345,12 +5345,23 @@ static int saves_import_seeds(){
  return accepted;
 }
 static void saves_load_index(){
- g_saves_count=0;FILE *f=fopen(g_saves_index_path,"rb");if(!f)return;
- if(fseek(f,0,SEEK_END)!=0){fclose(f);return;}long size=ftell(f);
- if(size<=0||size>1600000L){fclose(f);return;}rewind(f);
- char *buf=(char*)malloc((size_t)size+1);if(!buf){fclose(f);return;}
- size_t n=fread(buf,1,(size_t)size,f);fclose(f);buf[n]=0;
- g_saves_count=gfs_parse_index(buf,g_saves_entries,GFS_MAX_ENTRIES);if(g_saves_count<0)g_saves_count=0;free(buf);
+ /* Parse bounded TSV rows instead of allocating the entire catalogue.
+    This also supports catalogues larger than the former 1.6 MiB limit. */
+ g_saves_count=0;
+ FILE *f=fopen(g_saves_index_path,"rb");if(!f)return;
+ char row[1801];
+ while(g_saves_count<GFS_MAX_ENTRIES && fgets(row,sizeof(row),f)){
+  size_t n=strlen(row);
+  if(!n)continue;
+  if(row[n-1]!='\n' && !feof(f)){
+   /* Discard oversized records rather than accepting truncated URLs. */
+   int c;while((c=fgetc(f))!=EOF && c!='\n'){}
+   continue;
+  }
+  int parsed=gfs_parse_index(row,&g_saves_entries[g_saves_count],1);
+  if(parsed==1)g_saves_count++;
+ }
+ fclose(f);
 }
 static const char *saves_bucket_label(int b){static const char *const labels[]={"0-9","A","B","C","D","E","F","G","H","I","J","K","L","M","N","O","P","Q","R","S","T","U","V","W","X","Y","Z"};return labels[b>=0&&b<27?b:0];}
 static int saves_row(int row,char *label,size_t cap){
