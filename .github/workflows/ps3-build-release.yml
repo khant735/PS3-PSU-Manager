@@ -141,9 +141,15 @@ jobs:
         run: |
           set -eu
           mkdir -p vendor/lzma/C
-          curl -fL --retry 3 --max-time 90 \
-            https://codeload.github.com/ip7z/7zip/tar.gz/refs/heads/main \
-            -o /tmp/ps3-7zip-sdk.tar.gz
+          python3 - <<'PY'
+          import urllib.request
+          url='https://codeload.github.com/ip7z/7zip/tar.gz/refs/heads/main'
+          request=urllib.request.Request(url,headers={'User-Agent':'PS3-PSU-Manager-CI'})
+          with urllib.request.urlopen(request,timeout=90) as response:
+              data=response.read(30*1024*1024+1)
+          assert len(data)<=30*1024*1024,'7-Zip source archive exceeds size limit'
+          with open('/tmp/ps3-7zip-sdk.tar.gz','wb') as output:output.write(data)
+          PY
           tar -xzf /tmp/ps3-7zip-sdk.tar.gz --strip-components=2 \
             -C vendor/lzma/C 7zip-main/C/
           test -s vendor/lzma/C/7zDec.c
