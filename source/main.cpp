@@ -92,7 +92,7 @@ static int g_psu_metadata_active=0,g_psu_metadata_page=0;
 /* v1.49 render consolidation: PSU Details data is loaded once on modal open. */
 typedef struct { int valid; psu_entry_t root; int root_ok; unsigned char *icon_sys; size_t icon_sys_size; psu_entry_t entries[256]; int entry_count; } psu_meta_cache_t;
 static psu_meta_cache_t g_psu_meta_cache={0};
-static int g_options_active=0,g_options_selected=0,g_fps_enabled=1,g_download_connections=0,g_ram_enabled=1,g_ram_interval_seconds=2;
+static int g_options_active=0,g_options_selected=0,g_fps_enabled=1,g_download_connections=0,g_ram_enabled=0,g_ram_interval_seconds=2;
 static unsigned int g_ram_total=0,g_ram_available=0;
 static unsigned long long g_ram_last_sample_us=0;
 static int g_ram_valid=0;
@@ -3669,7 +3669,7 @@ static void draw(){
     them in the normal title-bar composition instead of independently drawn
     overlay badges, avoiding extra overlay rectangles and stale-buffer badges. */
  unsigned long long ram_now_us=fps_now_us();
- if(g_ram_enabled && (!g_ram_last_sample_us || ram_now_us-g_ram_last_sample_us >= (unsigned long long)g_ram_interval_seconds*1000000ULL)){
+ if(g_ram_enabled && g_frame_counter>=300 && (!g_ram_last_sample_us || ram_now_us-g_ram_last_sample_us >= (unsigned long long)g_ram_interval_seconds*1000000ULL)){
   g_ram_valid=(ps3_ram_get_user_pool(&g_ram_total,&g_ram_available)==0);
   g_ram_last_sample_us=ram_now_us;
  }
@@ -6053,7 +6053,7 @@ static void game_db_auto_check(void){
  if(sysThreadCreate(&thread,game_db_background_worker,NULL,1500,0x10000,0,(char*)"ps2_game_db")!=0)g_game_db_running=0;
 }
 
-int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_sampler,NULL,1500,0x4000,0,(char*)"psu_5g_fifo");ioPadInit(7);atexit(shutdown_video);sysUtilRegisterCallback(0,sysutil_cb,NULL);load_settings();catalogue_load_cache();set_device_default_path("/dev_hdd0");refresh_fs();game_db_auto_check();g_last_user_activity_us=fps_now_us();enum{B_UP=1<<0,B_DOWN=1<<1,B_CROSS=1<<2,B_CIRCLE=1<<3,B_SQUARE=1<<4,B_TRIANGLE=1<<5,B_SELECT=1<<6,B_START=1<<7,B_L1=1<<8,B_R1=1<<9,B_LEFT=1<<10,B_RIGHT=1<<11,B_L2=1<<12,B_R2=1<<13,B_R3=1<<14,B_L3=1<<15};padInfo pi;padData pd;u16 prev=0;while(running){
+int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_sampler,NULL,1500,0x4000,0,(char*)"psu_5g_fifo");ioPadInit(7);atexit(shutdown_video);sysUtilRegisterCallback(0,sysutil_cb,NULL);load_settings();g_ram_enabled=0; /* fail-safe: do not restore RAM syscall monitoring on startup until real hardware validates it */catalogue_load_cache();set_device_default_path("/dev_hdd0");refresh_fs();game_db_auto_check();g_last_user_activity_us=fps_now_us();enum{B_UP=1<<0,B_DOWN=1<<1,B_CROSS=1<<2,B_CIRCLE=1<<3,B_SQUARE=1<<4,B_TRIANGLE=1<<5,B_SELECT=1<<6,B_START=1<<7,B_L1=1<<8,B_R1=1<<9,B_LEFT=1<<10,B_RIGHT=1<<11,B_L2=1<<12,B_R2=1<<13,B_R3=1<<14,B_L3=1<<15};padInfo pi;padData pd;u16 prev=0;while(running){
  sysUtilCheckCallback();
  /* v1.49 clean-renderer recovery: do not touch video configuration, framebuffer
     snapshots, cache ownership, or DRAW_BEGIN/DRAW_END.  Request one ordinary
