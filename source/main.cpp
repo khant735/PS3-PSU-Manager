@@ -40,6 +40,10 @@
 #include "ps2homebrew_catalogue.h"
 #include "catalogue_action.h"
 #include "gamefaqs_saves_index.h"
+#include "gamefaqs_7z_bridge.h"
+#ifdef GFS_ENABLE_7Z
+#include "ps3_gfs_7z.h"
+#endif
 #include "gamefaqs_html_native.h"
 #include "ui_text_layout.h"
 #include "icn_texture.h"
@@ -5344,7 +5348,27 @@ static int saves_import_seeds(){
  if(accepted==0)return invalid?-4:0;
  return accepted;
 }
+/* Non-solid 7z cache adapter. Only enabled when the 7-Zip SDK is linked. */
+#ifdef GFS_ENABLE_7Z
+static int saves_append_compressed_entry(const gfs_save_t *entry,void *unused){
+ (void)unused;
+ if(g_saves_count>=GFS_MAX_ENTRIES)return -1;
+ g_saves_entries[g_saves_count++]=*entry;
+ return 0;
+}
+static int saves_load_compressed_index(void){
+ const char *path="/dev_hdd0/game/PSU000001/USRDIR/GAMEFAQS_SAVES.7z";
+ gfs_7z_import_context ctx={saves_append_compressed_entry,NULL,0,0};
+ g_saves_count=0;
+ int rc=ps3_gfs_read_7z(path,2u*1024u*1024u,gfs_7z_import_line,&ctx);
+ if(rc!=0){g_saves_count=0;return rc;}
+ return (int)ctx.accepted;
+}
+#endif
 static void saves_load_index(){
+#ifdef GFS_ENABLE_7Z
+ if(saves_load_compressed_index()>=0)return;
+#endif
  /* Parse bounded TSV rows instead of allocating the entire catalogue.
     This also supports catalogues larger than the former 1.6 MiB limit. */
  g_saves_count=0;
