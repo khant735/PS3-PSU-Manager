@@ -92,7 +92,10 @@ static int g_psu_metadata_active=0,g_psu_metadata_page=0;
 /* v1.49 render consolidation: PSU Details data is loaded once on modal open. */
 typedef struct { int valid; psu_entry_t root; int root_ok; unsigned char *icon_sys; size_t icon_sys_size; psu_entry_t entries[256]; int entry_count; } psu_meta_cache_t;
 static psu_meta_cache_t g_psu_meta_cache={0};
-static int g_options_active=0,g_options_selected=0,g_fps_enabled=1,g_download_connections=0;
+static int g_options_active=0,g_options_selected=0,g_fps_enabled=1,g_download_connections=0,g_ram_enabled=1,g_ram_interval_seconds=2;
+static unsigned int g_ram_total=0,g_ram_available=0;
+static unsigned long long g_ram_last_sample_us=0;
+static int g_ram_valid=0;
 /* 0 = PS2Wiki, 1 = PS2 Homebrew Store. */
 static int g_psu_catalogue_source=0;
 /* Phase 5Q: optional live PS2Wiki catalogue with offline cache. */
@@ -131,6 +134,8 @@ static void load_settings(){
  char line[128];
  while(fgets(line,sizeof(line),f)){
   int v; if(sscanf(line,"fps_meter=%d",&v)==1)g_fps_enabled=v?1:0;
+  else if(sscanf(line,"ram_meter=%d",&v)==1)g_ram_enabled=v?1:0;
+  else if(sscanf(line,"ram_update_seconds=%d",&v)==1){if(v!=1&&v!=2&&v!=5&&v!=10)v=2;g_ram_interval_seconds=v;}
   else if(sscanf(line,"download_connections=%d",&v)==1){if(v<0)v=0;if(v>16)v=16;g_download_connections=v;}
  }
  fclose(f);
@@ -139,6 +144,8 @@ static int save_settings(){
  FILE *f=fopen(g_settings_path,"wb"); if(!f)return -1;
  fprintf(f,"# PS2 .psu Save Manager settings\n");
  fprintf(f,"fps_meter=%d\n",g_fps_enabled?1:0);
+ fprintf(f,"ram_meter=%d\n",g_ram_enabled?1:0);
+ fprintf(f,"ram_update_seconds=%d\n",g_ram_interval_seconds);
  fprintf(f,"download_connections=%d\n",g_download_connections);
  fclose(f); return 0;
 }
@@ -3661,11 +3668,21 @@ static void draw(){
  /* v1.49: FPS and current-device indicator are plain title-bar text.  Keep
     them in the normal title-bar composition instead of independently drawn
     overlay badges, avoiding extra overlay rectangles and stale-buffer badges. */
- char title_status[96],compact_status[48];
- if(g_fps_enabled) snprintf(title_status,sizeof(title_status),"(FPS:%.1f D:%.1f F:%.1f T:%.1fms) %s",g_fps_value,g_perf_draw_ms,g_perf_flip_ms,g_perf_frame_ms,mode);
- else snprintf(title_status,sizeof(title_status),"%s",mode);
- if(g_fps_enabled)snprintf(compact_status,sizeof(compact_status),"FPS:%.1f %s",g_fps_value,mode);
- else snprintf(compact_status,sizeof(compact_status),"%s",mode);
+ unsigned long long ram_now_us=fps_now_us();
+ if(g_ram_enabled && (!g_ram_last_sample_us || ram_now_us-g_ram_last_sample_us >= (unsigned long long)g_ram_interval_seconds*1000000ULL)){
+  g_ram_valid=(ps3_ram_get_user_pool(&g_ram_total,&g_ram_available)==0);
+  g_ram_last_sample_us=ram_now_us;
+ }
+ char ram_label[48]="";
+ if(g_ram_enabled){
+  if(g_ram_valid)snprintf(ram_label,sizeof(ram_label)," RAM:%u/%uMiB",(g_ram_total-g_ram_available)/(1024u*1024u),g_ram_total/(1024u*1024u));
+  else snprintf(ram_label,sizeof(ram_label)," RAM:N/A");
+ }
+ char title_status[160],compact_status[96];
+ if(g_fps_enabled)snprintf(title_status,sizeof(title_status),"(FPS:%.1f D:%.1f F:%.1f T:%.1fms)%s %s",g_fps_value,g_perf_draw_ms,g_perf_flip_ms,g_perf_frame_ms,ram_label,mode);
+ else snprintf(title_status,sizeof(title_status),"%s %s",ram_label,mode);
+ if(g_fps_enabled)snprintf(compact_status,sizeof(compact_status),"FPS:%.1f%s %s",g_fps_value,ram_label,mode);
+ else snprintf(compact_status,sizeof(compact_status),"%s %s",ram_label,mode);
  int status_scale=g_title_scale;
  int status_w=text_width(title_status,status_scale);
  while(status_scale>1&&status_w>(int)g_width-g_margin*2){status_scale--;status_w=text_width(title_status,status_scale);}
@@ -3674,7 +3691,7 @@ static void draw(){
  int title_draw_scale=g_title_scale;
  int titlew=text_width(title,title_draw_scale);
  int title_space=ui_inline_left_available_width(title_tx,status_x,18);
- if(g_fps_enabled&&titlew>title_space){
+ if((g_fps_enabled||g_ram_enabled)&&titlew>title_space){
   snprintf(title_status,sizeof(title_status),"%s",compact_status);
   status_scale=g_title_scale;status_w=text_width(title_status,status_scale);
   while(status_scale>1&&status_w>right_edge){status_scale--;status_w=text_width(title_status,status_scale);}
@@ -5519,15 +5536,19 @@ static void catalogue_download_selected(){
 static void draw_options_menu(){
  if(!g_options_active)return;
  const legend_entry_t controls[]={{"UP/DOWN","SELECT"},{"LEFT/RIGHT","CHANGE CATALOGUE"},{"X","CHANGE / OPEN"},{"O","CLOSE"}};
- char rows[7][128];snprintf(rows[0],sizeof(rows[0]),"FPS METER: %s",g_fps_enabled?"ENABLED":"DISABLED");snprintf(rows[1],sizeof(rows[1]),"SIMULTANEOUS DL CONNECTIONS: %d",g_download_connections);snprintf(rows[2],sizeof(rows[2]),"FILE DOWNLOADER - DIRECT URL");snprintf(rows[3],sizeof(rows[3]),"PSU CATALOGUE: %s",g_psu_catalogue_source==0?"PS2WIKI":g_psu_catalogue_source==1?"PS2 HOMEBREW STORE":"GAMEFAQS SAVES");snprintf(rows[4],sizeof(rows[4]),"UPDATE PS2 GAME DATABASE (ONLINE)");snprintf(rows[5],sizeof(rows[5]),"EXIT TO XMB");
- unsigned int ram_total=0,ram_available=0;
- if(ps3_ram_get_user_pool(&ram_total,&ram_available)==0)
-  snprintf(rows[6],sizeof(rows[6]),"RAM USED: %u / %u MiB", (ram_total-ram_available)/(1024u*1024u),ram_total/(1024u*1024u));
- else snprintf(rows[6],sizeof(rows[6]),"RAM USED: UNAVAILABLE");
- int desired=300;for(int i=0;i<7;i++){int z=text_width(rows[i],g_body_scale)+64;if(z>desired)desired=z;}for(int i=0;i<4;i++){int z=token_width_for(controls[i].token,g_help_scale)+legend_text_width(controls[i].action,g_help_scale)+56;if(z>desired)desired=z;}
+ char rows[8][128];
+ snprintf(rows[0],sizeof(rows[0]),"FPS METER: %s",g_fps_enabled?"ENABLED":"DISABLED");
+ snprintf(rows[1],sizeof(rows[1]),"SIMULTANEOUS DL CONNECTIONS: %d",g_download_connections);
+ snprintf(rows[2],sizeof(rows[2]),"FILE DOWNLOADER - DIRECT URL");
+ snprintf(rows[3],sizeof(rows[3]),"PSU CATALOGUE: %s",g_psu_catalogue_source==0?"PS2WIKI":g_psu_catalogue_source==1?"PS2 HOMEBREW STORE":"GAMEFAQS SAVES");
+ snprintf(rows[4],sizeof(rows[4]),"UPDATE PS2 GAME DATABASE (ONLINE)");
+ snprintf(rows[5],sizeof(rows[5]),"RAM METER: %s",g_ram_enabled?"ENABLED":"DISABLED");
+ snprintf(rows[6],sizeof(rows[6]),"RAM UPDATE INTERVAL: %d SECOND%s",g_ram_interval_seconds,g_ram_interval_seconds==1?"":"S");
+ snprintf(rows[7],sizeof(rows[7]),"EXIT TO XMB");
+ int desired=300;for(int i=0;i<8;i++){int z=text_width(rows[i],g_body_scale)+64;if(z>desired)desired=z;}for(int i=0;i<4;i++){int z=token_width_for(controls[i].token,g_help_scale)+legend_text_width(controls[i].action,g_help_scale)+56;if(z>desired)desired=z;}
  int w=ui_compact_panel_width((int)g_width,desired,720,16);
- int contentw=w-64,rows_h=0,row_heights[7];
- for(int i=0;i<7;i++){row_heights[i]=wrapped_text_advance(rows[i],contentw,g_body_scale);if(row_heights[i]<ui_text_line_pitch(g_body_scale))row_heights[i]=ui_text_line_pitch(g_body_scale);rows_h+=row_heights[i]+3;}
+ int contentw=w-64,rows_h=0,row_heights[8];
+ for(int i=0;i<8;i++){row_heights[i]=wrapped_text_advance(rows[i],contentw,g_body_scale);if(row_heights[i]<ui_text_line_pitch(g_body_scale))row_heights[i]=ui_text_line_pitch(g_body_scale);rows_h+=row_heights[i]+3;}
  int control_lines=measure_control_legend_lines(controls,4,w-44,g_help_scale),controls_h=control_lines*legend_line_height(g_help_scale);
  int h=56+rows_h+8+controls_h+18;if(h>(int)g_height-8)h=(int)g_height-8;if(h<80)h=80;int x=((int)g_width-w)/2,y=((int)g_height-h)/2;if(y<4)y=4;
  round_rect(x+7,y+9,w,h,10,0x50000000u);
@@ -5536,7 +5557,7 @@ static void draw_options_menu(){
  rect(x+8,y+51,w-16,1,0xA05D7892u); rect(x+4,y+6,5,h-12,0xFF4CC2FFu);
  text(x+22,y+18,"OPTIONS",0xFFFFFFFFu,g_title_scale);
  int ry=y+60;
- for(int i=0;i<7;i++){
+ for(int i=0;i<8;i++){
   int rowh=row_heights[i]+3;
   if(i==g_options_selected)round_rect(x+18,ry-3,w-36,rowh,5,0xFF315978u);
   text_bounded(x+32,ry,contentw,row_heights[i],rows[i],0xFFFFFFFFu,g_body_scale);
@@ -6072,8 +6093,8 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
  }
  if(g_options_active){
   if(press&B_UP){if(g_options_selected>0)g_options_selected--;g_ui_dirty=1;}
-  if(press&B_DOWN){if(g_options_selected<5)g_options_selected++;g_ui_dirty=1;}
-  if(press&B_LEFT||press&B_RIGHT){if(g_options_selected==0){g_fps_enabled=!g_fps_enabled;g_ui_dirty=1;}else if(g_options_selected==1){if(press&B_RIGHT){if(g_download_connections<16)g_download_connections++;}else{if(g_download_connections>0)g_download_connections--;}g_ui_dirty=1;}else if(g_options_selected==3){g_psu_catalogue_source=(g_psu_catalogue_source+(press&B_RIGHT?1:2))%3;g_ui_dirty=1;}}
+  if(press&B_DOWN){if(g_options_selected<7)g_options_selected++;g_ui_dirty=1;}
+  if(press&B_LEFT||press&B_RIGHT){if(g_options_selected==0){g_fps_enabled=!g_fps_enabled;g_ui_dirty=1;}else if(g_options_selected==1){if(press&B_RIGHT){if(g_download_connections<16)g_download_connections++;}else{if(g_download_connections>0)g_download_connections--;}g_ui_dirty=1;}else if(g_options_selected==3){g_psu_catalogue_source=(g_psu_catalogue_source+(press&B_RIGHT?1:2))%3;g_ui_dirty=1;}else if(g_options_selected==5){g_ram_enabled=!g_ram_enabled;g_ui_dirty=1;}else if(g_options_selected==6){const int intervals[]={1,2,5,10};int k=0;while(k<3&&intervals[k]!=g_ram_interval_seconds)k++;g_ram_interval_seconds=intervals[(k+(press&B_RIGHT?1:3))%4];g_ram_last_sample_us=0;g_ui_dirty=1;}}
   if(press&B_CROSS){if(g_options_selected==0){g_fps_enabled=!g_fps_enabled;g_ui_dirty=1;}else if(g_options_selected==1){g_download_connections=(g_download_connections+1)%17;g_ui_dirty=1;}else if(g_options_selected==2){start_url_keyboard();draw();continue;}else if(g_options_selected==3){if(g_psu_catalogue_source==0){g_options_active=0;g_catalogue_active=1;g_catalogue_category=0;g_catalogue_selected=0;g_catalogue_top_index=0;g_ui_dirty=1;draw();catalogue_open_first_populated_category();draw();continue;}else if(g_psu_catalogue_source==2){g_options_active=0;g_saves_active=1;g_saves_level=0;g_saves_selected=g_saves_top=0;
     saves_load_index();
     if(!g_saves_count){
@@ -6087,7 +6108,7 @@ int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_samp
      else if(imported<0)
       snprintf(status_line,sizeof(status_line),"GameFAQs seed import failed (%d)",imported);
     }
-    g_ui_dirty=1;draw();continue;}else{g_options_active=0;g_homebrew_active=1;g_homebrew_category=0;g_homebrew_selected=0;g_homebrew_top=0;g_homebrew_view=0;homebrew_catalogue_load_cache();g_ui_dirty=1;draw();homebrew_open_first_populated_category();draw();continue;}}else if(g_options_selected==4){char dbmsg[256]={0};int net_ok=g_game_db_running?0:downloader_net_init();int n=(g_game_db_running||net_ok!=0)?-1:ps2_game_db_update("/dev_hdd0/game/PSU000001/USRDIR/PS2_GAME_TITLES.tsv",dbmsg,sizeof(dbmsg));if(net_ok!=0)snprintf(dbmsg,sizeof(dbmsg),"PS3 network initialization failed");if(g_game_db_running)snprintf(dbmsg,sizeof(dbmsg),"Automatic update already running");snprintf(status_line,sizeof(status_line),"Game DB: %s",dbmsg[0]?dbmsg:(n>=0?"Updated":"Update failed"));g_ui_dirty=1;}else{save_settings();strcpy(status_line,"Settings saved - exiting to XMB...");running=0;continue;}}
+    g_ui_dirty=1;draw();continue;}else{g_options_active=0;g_homebrew_active=1;g_homebrew_category=0;g_homebrew_selected=0;g_homebrew_top=0;g_homebrew_view=0;homebrew_catalogue_load_cache();g_ui_dirty=1;draw();homebrew_open_first_populated_category();draw();continue;}}else if(g_options_selected==4){char dbmsg[256]={0};int net_ok=g_game_db_running?0:downloader_net_init();int n=(g_game_db_running||net_ok!=0)?-1:ps2_game_db_update("/dev_hdd0/game/PSU000001/USRDIR/PS2_GAME_TITLES.tsv",dbmsg,sizeof(dbmsg));if(net_ok!=0)snprintf(dbmsg,sizeof(dbmsg),"PS3 network initialization failed");if(g_game_db_running)snprintf(dbmsg,sizeof(dbmsg),"Automatic update already running");snprintf(status_line,sizeof(status_line),"Game DB: %s",dbmsg[0]?dbmsg:(n>=0?"Updated":"Update failed"));g_ui_dirty=1;}else if(g_options_selected==5){g_ram_enabled=!g_ram_enabled;g_ui_dirty=1;}else if(g_options_selected==6){const int intervals[]={1,2,5,10};int k=0;while(k<3&&intervals[k]!=g_ram_interval_seconds)k++;g_ram_interval_seconds=intervals[(k+1)%4];g_ram_last_sample_us=0;g_ui_dirty=1;}else{save_settings();strcpy(status_line,"Settings saved - exiting to XMB...");running=0;continue;}}
   if(press&B_CIRCLE||press&B_START){int sr=save_settings();g_options_active=0;g_ui_dirty=1;snprintf(status_line,sizeof(status_line),sr==0?"Options saved":"Could not save settings.ini");}
   draw();continue;
  }
