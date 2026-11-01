@@ -9,7 +9,7 @@ int gfs_7z_import_line(const char *line, size_t length, void *context) {
   int parsed;
   if(!ctx||!ctx->on_entry||!line)return -1;
   if(length==0||line[0]=='#')return 0;
-  if(length>=sizeof(row)||memchr(line,0,length)){
+  if(length>=sizeof(row)-1||memchr(line,0,length)){
     ctx->rejected++;
     return -1;
   }
