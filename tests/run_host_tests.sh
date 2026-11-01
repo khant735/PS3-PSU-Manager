@@ -42,3 +42,6 @@ cc -std=c99 -Wall -Wextra -Isource tests/test_gamefaqs_pipeline.c source/gamefaq
 
 cc -std=c99 -Wall -Wextra -Isource tests/test_gamefaqs_crawl.c source/gamefaqs_crawl.c source/gamefaqs_discovery_pipeline.c source/gamefaqs_html_native.c source/gamefaqs_page_index.c source/gamefaqs_index_store.c source/gamefaqs_saves_index.c -o "$test_dir/gamefaqs-crawl"
 "$test_dir/gamefaqs-crawl" "$test_dir"
+
+cc -std=c99 -Wall -Wextra -Isource tests/test_gamefaqs_7z_bridge.c source/gamefaqs_7z_bridge.c source/gamefaqs_saves_index.c -o "$test_dir/gamefaqs-7z-bridge"
+"$test_dir/gamefaqs-7z-bridge"
