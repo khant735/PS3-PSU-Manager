@@ -40,6 +40,7 @@
 #include "ps2homebrew_catalogue.h"
 #include "catalogue_action.h"
 #include "gamefaqs_saves_index.h"
+#include "ps3_ram_meter.h"
 #include "gamefaqs_7z_bridge.h"
 #ifdef GFS_ENABLE_7Z
 #include "ps3_gfs_7z.h"
@@ -5518,11 +5519,15 @@ static void catalogue_download_selected(){
 static void draw_options_menu(){
  if(!g_options_active)return;
  const legend_entry_t controls[]={{"UP/DOWN","SELECT"},{"LEFT/RIGHT","CHANGE CATALOGUE"},{"X","CHANGE / OPEN"},{"O","CLOSE"}};
- char rows[6][128];snprintf(rows[0],sizeof(rows[0]),"FPS METER: %s",g_fps_enabled?"ENABLED":"DISABLED");snprintf(rows[1],sizeof(rows[1]),"SIMULTANEOUS DL CONNECTIONS: %d",g_download_connections);snprintf(rows[2],sizeof(rows[2]),"FILE DOWNLOADER - DIRECT URL");snprintf(rows[3],sizeof(rows[3]),"PSU CATALOGUE: %s",g_psu_catalogue_source==0?"PS2WIKI":g_psu_catalogue_source==1?"PS2 HOMEBREW STORE":"GAMEFAQS SAVES");snprintf(rows[4],sizeof(rows[4]),"UPDATE PS2 GAME DATABASE (ONLINE)");snprintf(rows[5],sizeof(rows[5]),"EXIT TO XMB");
- int desired=300;for(int i=0;i<6;i++){int z=text_width(rows[i],g_body_scale)+64;if(z>desired)desired=z;}for(int i=0;i<4;i++){int z=token_width_for(controls[i].token,g_help_scale)+legend_text_width(controls[i].action,g_help_scale)+56;if(z>desired)desired=z;}
+ char rows[7][128];snprintf(rows[0],sizeof(rows[0]),"FPS METER: %s",g_fps_enabled?"ENABLED":"DISABLED");snprintf(rows[1],sizeof(rows[1]),"SIMULTANEOUS DL CONNECTIONS: %d",g_download_connections);snprintf(rows[2],sizeof(rows[2]),"FILE DOWNLOADER - DIRECT URL");snprintf(rows[3],sizeof(rows[3]),"PSU CATALOGUE: %s",g_psu_catalogue_source==0?"PS2WIKI":g_psu_catalogue_source==1?"PS2 HOMEBREW STORE":"GAMEFAQS SAVES");snprintf(rows[4],sizeof(rows[4]),"UPDATE PS2 GAME DATABASE (ONLINE)");snprintf(rows[5],sizeof(rows[5]),"EXIT TO XMB");
+ unsigned int ram_total=0,ram_available=0;
+ if(ps3_ram_get_user_pool(&ram_total,&ram_available)==0)
+  snprintf(rows[6],sizeof(rows[6]),"RAM USED: %u / %u MiB", (ram_total-ram_available)/(1024u*1024u),ram_total/(1024u*1024u));
+ else snprintf(rows[6],sizeof(rows[6]),"RAM USED: UNAVAILABLE");
+ int desired=300;for(int i=0;i<7;i++){int z=text_width(rows[i],g_body_scale)+64;if(z>desired)desired=z;}for(int i=0;i<4;i++){int z=token_width_for(controls[i].token,g_help_scale)+legend_text_width(controls[i].action,g_help_scale)+56;if(z>desired)desired=z;}
  int w=ui_compact_panel_width((int)g_width,desired,720,16);
- int contentw=w-64,rows_h=0,row_heights[6];
- for(int i=0;i<6;i++){row_heights[i]=wrapped_text_advance(rows[i],contentw,g_body_scale);if(row_heights[i]<ui_text_line_pitch(g_body_scale))row_heights[i]=ui_text_line_pitch(g_body_scale);rows_h+=row_heights[i]+3;}
+ int contentw=w-64,rows_h=0,row_heights[7];
+ for(int i=0;i<7;i++){row_heights[i]=wrapped_text_advance(rows[i],contentw,g_body_scale);if(row_heights[i]<ui_text_line_pitch(g_body_scale))row_heights[i]=ui_text_line_pitch(g_body_scale);rows_h+=row_heights[i]+3;}
  int control_lines=measure_control_legend_lines(controls,4,w-44,g_help_scale),controls_h=control_lines*legend_line_height(g_help_scale);
  int h=56+rows_h+8+controls_h+18;if(h>(int)g_height-8)h=(int)g_height-8;if(h<80)h=80;int x=((int)g_width-w)/2,y=((int)g_height-h)/2;if(y<4)y=4;
  round_rect(x+7,y+9,w,h,10,0x50000000u);
@@ -5531,7 +5536,7 @@ static void draw_options_menu(){
  rect(x+8,y+51,w-16,1,0xA05D7892u); rect(x+4,y+6,5,h-12,0xFF4CC2FFu);
  text(x+22,y+18,"OPTIONS",0xFFFFFFFFu,g_title_scale);
  int ry=y+60;
- for(int i=0;i<6;i++){
+ for(int i=0;i<7;i++){
   int rowh=row_heights[i]+3;
   if(i==g_options_selected)round_rect(x+18,ry-3,w-36,rowh,5,0xFF315978u);
   text_bounded(x+32,ry,contentw,row_heights[i],rows[i],0xFFFFFFFFu,g_body_scale);
