@@ -142,10 +142,10 @@ jobs:
           set -eu
           mkdir -p vendor/lzma/C
           curl -fL --retry 3 --max-time 90 \
-            https://github.com/ip7z/7zip/archive/refs/heads/main.tar.gz \
+            https://codeload.github.com/ip7z/7zip/tar.gz/refs/heads/main \
             -o /tmp/ps3-7zip-sdk.tar.gz
           tar -xzf /tmp/ps3-7zip-sdk.tar.gz --strip-components=2 \
-            -C vendor/lzma/C 7zip-main/C
+            -C vendor/lzma/C 7zip-main/C/
           test -s vendor/lzma/C/7zDec.c
           test -s vendor/lzma/C/Lzma2Dec.c
       - name: Compile ELF and generate SELF / PKG
