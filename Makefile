@@ -6,15 +6,15 @@ include $(PSL1GHT)/ppu_rules
 
 TARGET := ps3psumanager
 BUILD := build
-SOURCES := source vendor/lzma/C
-INCLUDES := include vendor/lzma/C
+SOURCES := source
+INCLUDES := include
 TITLE := PS2 .psu Save Manager v1.64
 APPID := PSU000001
 CONTENTID := UP0001-$(APPID)_00-0000000000000000
 ICON0 := $(CURDIR)/assets/ICON0.PNG
 SFOXML := $(CURDIR)/assets/sfo.xml
 PKGFILES := $(CURDIR)/pkgfiles
-CFLAGS := -DGFS_ENABLE_7Z -O1 -ffast-math -fno-math-errno -Wall -mcpu=cell $(MACHDEP) $(INCLUDE)
+CFLAGS := -O1 -ffast-math -fno-math-errno -Wall -mcpu=cell $(MACHDEP) $(INCLUDE)
 CXXFLAGS := $(CFLAGS) -fno-exceptions -fno-rtti
 LDFLAGS := $(MACHDEP) -Wl,-Map,$(notdir $@).map -Wl,--wrap=rsxtiny_Init -Wl,--wrap=gcmGetFlipStatus -Wl,--wrap=gcmResetFlipStatus -Wl,--wrap=gcmSetFlip -Wl,--wrap=gcmSetWaitFlip -Wl,--wrap=gcmSetFlipMode -Wl,--wrap=rsxtiny_MakeCmdSpace -Wl,--wrap=tiny_rsxContextCallback -Wl,--wrap=setupRenderTarget -Wl,--wrap=sysUtilCheckCallback
 LIBS := -lfont3d -ltiny3d -lfont -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lz -lnet -lnetctl -lsysmodule -lrsx -lgcm_sys -lio -lsysutil -lrt -llv2 -lm
@@ -25,8 +25,7 @@ export OUTPUT := $(CURDIR)/$(TARGET)
 export VPATH := $(foreach dir,$(SOURCES),$(CURDIR)/$(dir))
 export DEPSDIR := $(CURDIR)/$(BUILD)
 export BUILDDIR := $(CURDIR)/$(BUILD)
-LZMA_CFILES := 7zAlloc.c 7zArcIn.c 7zBuf.c 7zBuf2.c 7zCrc.c 7zCrcOpt.c 7zDec.c 7zFile.c 7zStream.c Bcj2.c Bra.c Bra86.c BraIA64.c CpuArch.c Delta.c Lzma2Dec.c LzmaDec.c Ppmd7.c Ppmd7Dec.c
-CFILES := $(notdir $(wildcard source/*.c)) $(LZMA_CFILES)
+CFILES := $(filter-out ps3_gfs_7z.c ps3_ram_meter.c ps3_7z_creat_compat.c,$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c))))
 CPPFILES := $(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 export LD := $(CXX)
 export OFILES := $(CPPFILES:.cpp=.o) $(CFILES:.c=.o)
