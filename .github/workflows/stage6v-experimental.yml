@@ -172,13 +172,13 @@ jobs:
             echo "Refusing to overwrite existing prerelease $TEST_TAG" >&2
             exit 1
           fi
-          gh release create "$TEST_TAG" \\
-            dist/PS3-PSU-Manager-Stage6V-A.elf \\
-            dist/PS3-PSU-Manager-Stage6V-A.self \\
-            dist/PS3-PSU-Manager-Stage6V-A.pkg \\
-            dist/PS3-PSU-Manager-Stage6V-A-SOURCE.zip \\
-            dist/SHA256SUMS.txt \\
-            --target "$GITHUB_SHA" \\
-            --title "Stage 6V-A experimental test $TEST_TAG" \\
-            --notes "Experimental RSX diagnostics build. Source: $GITHUB_SHA. Requires real PS3 testing; not stable." \\
+          gh release create "$TEST_TAG" \
+            dist/PS3-PSU-Manager-Stage6V-A.elf \
+            dist/PS3-PSU-Manager-Stage6V-A.self \
+            dist/PS3-PSU-Manager-Stage6V-A.pkg \
+            dist/PS3-PSU-Manager-Stage6V-A-SOURCE.zip \
+            dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "Stage 6V-A experimental test $TEST_TAG" \
+            --notes "Experimental RSX diagnostics build. Source: $GITHUB_SHA. Requires real PS3 testing; not stable." \
             --prerelease
