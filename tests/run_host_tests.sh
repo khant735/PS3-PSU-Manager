@@ -26,6 +26,7 @@ g++ -std=c++17 -Iinclude tests/test_catalogue_action.cpp source/catalogue_action
 "$test_dir/catalogue-action"
 g++ -std=c++17 -Iinclude tests/test_icn_texture.cpp source/icn_texture.cpp -o "$test_dir/icn-texture"
 "$test_dir/icn-texture"
+python3 tests/test_segmented_write_callback.py
 python3 tests/test_catalogue_layout.py
 python3 tests/test_homebrew_catalogue_layout.py
 g++ -std=c++17 -Wall -Wextra -Iinclude tests/zip_archive_test_driver.cpp source/zip_extract.cpp -lz -o "$test_dir/zip-archive"
