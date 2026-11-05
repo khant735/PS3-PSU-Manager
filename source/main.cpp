@@ -5993,7 +5993,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation E: render exactly one normal UI frame, without FIFO or GameDB background threads. */
+ /* Startup isolation F: minimal Tiny3D clear+flip, no application draw(), no sampler, no GameDB. */
  if(video_init()!=0)return 2;
  ioPadInit(7);
  sysUtilRegisterCallback(0,sysutil_cb,NULL);
@@ -6001,8 +6001,9 @@ int main(){
  catalogue_load_cache();
  set_device_default_path("/dev_hdd0");
  refresh_fs();
- /* The normal draw path includes RSX command submission and Tiny3D flip. */
- draw();
+ /* Exercise Tiny3D's basic GPU submission and synchronized presentation only. */
+ tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+ tiny3d_Flip();
  sysUtilUnregisterCallback(0);
  ioPadEnd();
  shutdown_video();
