@@ -4527,7 +4527,8 @@ static size_t segment_write_cb(void *ptr,size_t size,size_t nmemb,void *ud){
     for every received block on every one of the 16 TLS connections.  Real
     PS3 spends that time on the PPU.  Connection diagnostics are sampled in
     the multi loop at 4 Hz instead, with identical visible information. */
- return n;
+ /* libcurl requires the number of BYTES consumed, not fwrite's item count. */
+ return (size_t)bytes;
 }
 enum { DOWNLOAD_VALIDATE_NONE=0, DOWNLOAD_VALIDATE_PSU=1, DOWNLOAD_VALIDATE_ZIP=2 };
 static int download_policy_for_url(const char *url){int kind=ps2hb_asset_kind_from_url(url);return kind==PS2HB_ASSET_PSU?DOWNLOAD_VALIDATE_PSU:(kind==PS2HB_ASSET_ZIP?DOWNLOAD_VALIDATE_ZIP:DOWNLOAD_VALIDATE_NONE);}
