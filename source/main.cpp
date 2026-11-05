@@ -3844,9 +3844,10 @@ static void draw(){
   char foot_break[224]; snprintf(foot_break,sizeof(foot_break),"%s",stage_break);
   text(g_margin+12,py+2+scale125(9*g_help_scale),foot_break,0xFFFFB45Au,g_help_scale);
   char flip_break[224];
-  snprintf(flip_break,sizeof(flip_break),"5N POLL N%u NZ%u S%u>%u %.1fms S1%.1f",
-   g_4x_status_polls,g_5k_poll_nonzero,(unsigned)g_5k_poll_first,(unsigned)g_5k_poll_last,
-   (g_5k_poll_first_us&&g_5k_poll_last_us)?(float)(g_5k_poll_last_us-g_5k_poll_first_us)/1000.0f:0.0f,g_5a_space1_ms);
+  snprintf(flip_break,sizeof(flip_break),"5N POLL N%u NZ%u %.1fms | 6V FIFO %.1fms C%u",
+   g_4x_status_polls,g_5k_poll_nonzero,
+   (g_5k_poll_first_us&&g_5k_poll_last_us)?(float)(g_5k_poll_last_us-g_5k_poll_first_us)/1000.0f:0.0f,
+   (float)g_6v_fifo_max_stagnant_us/1000.0f,(unsigned)g_6v_fifo_stagnant_samples);
   text(g_margin+12,py+2+scale125(18*g_help_scale),flip_break,0xFFFF8E5Au,g_help_scale);
 
  }
