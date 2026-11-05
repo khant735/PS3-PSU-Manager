@@ -1,0 +1,55 @@
+name: PS3 PSU Manager — Standalone Tiny3D Control
+on:
+  push:
+    branches: [research-tiny3d-crossproject-audit]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  control:
+    runs-on: ubuntu-24.04
+    container:
+      image: hldtux/ps3dev:latest
+    env:
+      PS3DEV: /usr/local/ps3dev
+      PSL1GHT: /usr/local/ps3dev/psl1ght
+    steps:
+      - name: Checkout
+        run: |
+          set -eu
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Audit compiler and every linked library
+        run: |
+          set -eu
+          mkdir -p dist
+          {
+            echo "commit=$GITHUB_SHA"
+            echo "container=hldtux/ps3dev:latest (mutable, NOT reproducible)"
+            powerpc64-ps3-elf-gcc --version | head -1
+            for lib in tiny3d font font3d curl mbedtls mbedx509 mbedcrypto z rsx gcm_sys; do
+              find "$PS3DEV" -name "lib${lib}.a" -type f -exec sha256sum '{}' ';'
+            done
+            for h in tiny3d.h libfont.h curl/curl.h mbedtls/ssl.h zlib.h; do
+              find "$PS3DEV" -path "*/$h" -type f -exec sha256sum '{}' ';'
+            done
+          } > dist/DEPENDENCY_MANIFEST.txt
+          cat dist/DEPENDENCY_MANIFEST.txt
+      - name: Compile independent Tiny3D test
+        run: |
+          set -eux
+          make -C tests/tiny3d_control -j2
+          test -s tests/tiny3d_control/tiny3d_control.elf
+          test -s tests/tiny3d_control/tiny3d_control.self
+          cp tests/tiny3d_control/tiny3d_control.elf dist/Tiny3D-Control.elf
+          cp tests/tiny3d_control/tiny3d_control.self dist/Tiny3D-Control.self
+          powerpc64-ps3-elf-nm -n dist/Tiny3D-Control.elf > dist/CONTROL_SYMBOLS.txt
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+      - name: Upload test ELF SELF and dependency report
+        uses: actions/upload-artifact@v4
+        with:
+          name: tiny3d-control-and-manifest
+          path: dist/
