@@ -1,0 +1,26 @@
+name: PS3 PSU Manager — Integration Audit Host Regression
+on:
+  push:
+    branches: [research-tiny3d-crossproject-audit]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check segmented libcurl write contract
+        run: python3 tests/test_segmented_write_callback.py
+      - name: Verify dependency inventory and package inputs
+        run: |
+          set -eu
+          test -f Makefile
+          test -f assets/sfo.xml
+          test -f assets/ICON0.PNG
+          test -f pkgfiles/USRDIR/cacert.pem
+          test -f source/zip_extract.cpp
+          test -f source/filen_crypto.cpp
+          test -f source/gamefaqs_curl_transport.c
+          grep -q -- '-lfont3d -ltiny3d -lfont -lcurl -lmbedtls' Makefile
+          echo 'PASS: required source and package inputs are present'
