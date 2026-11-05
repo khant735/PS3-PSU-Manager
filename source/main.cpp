@@ -5993,7 +5993,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation D: start the passive FIFO sampler, let it idle, stop and join before video teardown. No rendering. */
+ /* Startup isolation E: render exactly one normal UI frame, without FIFO or GameDB background threads. */
  if(video_init()!=0)return 2;
  ioPadInit(7);
  sysUtilRegisterCallback(0,sysutil_cb,NULL);
@@ -6001,10 +6001,8 @@ int main(){
  catalogue_load_cache();
  set_device_default_path("/dev_hdd0");
  refresh_fs();
- g_5g_sampler_stop=0;
- g_5g_sample_active=0;
- int fifo_started=(sysThreadCreate(&g_5g_thread,phase5g_sampler,NULL,1500,0x4000,0,(char*)"psu_5g_fifo")==0);
- if(fifo_started){usleep(250000);g_5g_sampler_stop=1;sysThreadJoin(g_5g_thread,NULL);}
+ /* The normal draw path includes RSX command submission and Tiny3D flip. */
+ draw();
  sysUtilUnregisterCallback(0);
  ioPadEnd();
  shutdown_video();
