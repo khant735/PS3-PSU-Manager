@@ -5993,7 +5993,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation F: minimal Tiny3D clear+flip, no application draw(), no sampler, no GameDB. */
+ /* Startup isolation H: direct Tiny3D triangle without application's RSX rectangle batch. */
  if(video_init()!=0)return 2;
  ioPadInit(7);
  sysUtilRegisterCallback(0,sysutil_cb,NULL);
@@ -6003,6 +6003,12 @@ int main(){
  refresh_fs();
  /* Exercise Tiny3D's basic GPU submission and synchronized presentation only. */
  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+ tiny3d_Project2D();
+ tiny3d_SetPolygon(TINY3D_TRIANGLES);
+ tiny3d_VertexPos(160.0f,100.0f,0.0f);tiny3d_VertexColor(0xFF0000FFu);
+ tiny3d_VertexPos(450.0f,100.0f,0.0f);tiny3d_VertexColor(0x00FF00FFu);
+ tiny3d_VertexPos(300.0f,330.0f,0.0f);tiny3d_VertexColor(0x0000FFFFu);
+ tiny3d_End();
  tiny3d_Flip();
  sysUtilUnregisterCallback(0);
  ioPadEnd();
