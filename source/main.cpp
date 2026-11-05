@@ -5993,7 +5993,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation I: persistent checkpoints around Tiny3D geometry calls.
+ /* Startup isolation J: split the third vertex position and color checkpoints.
     Deliberately omit Flip to isolate CPU-side geometry submission. */
  const char *diag="/dev_hdd0/tmp/ps3psu_gpu_diag.log";
  FILE *log=fopen(diag,"w");
@@ -6024,12 +6024,15 @@ int main(){
  GPU_CHECKPOINT("I12 BEFORE VERTEX 2");
  tiny3d_VertexPos(450.0f,100.0f,0.0f);tiny3d_VertexColor(0x00FF00FFu);
  GPU_CHECKPOINT("I13 AFTER VERTEX 2");
- GPU_CHECKPOINT("I14 BEFORE VERTEX 3");
- tiny3d_VertexPos(300.0f,330.0f,0.0f);tiny3d_VertexColor(0x0000FFFFu);
- GPU_CHECKPOINT("I15 AFTER VERTEX 3");
- GPU_CHECKPOINT("I16 BEFORE END");
+ GPU_CHECKPOINT("J14 BEFORE VERTEX 3 POSITION");
+ tiny3d_VertexPos(300.0f,330.0f,0.0f);
+ GPU_CHECKPOINT("J15 AFTER VERTEX 3 POSITION");
+ GPU_CHECKPOINT("J16 BEFORE VERTEX 3 COLOR");
+ tiny3d_VertexColor(0x0000FFFFu);
+ GPU_CHECKPOINT("J17 AFTER VERTEX 3 COLOR");
+ GPU_CHECKPOINT("J18 BEFORE END");
  tiny3d_End();
- GPU_CHECKPOINT("I17 AFTER END - FLIP INTENTIONALLY SKIPPED");
+ GPU_CHECKPOINT("J19 AFTER END - FLIP INTENTIONALLY SKIPPED");
  GPU_CHECKPOINT("I18 BEFORE SHUTDOWN");
  sysUtilUnregisterCallback(0);
  ioPadEnd();
