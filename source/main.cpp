@@ -373,22 +373,32 @@ static u32 g_5b_cb_arg=0;
    the callback, command stream, VSYNC or framebuffer ownership. */
 static volatile int g_5g_sample_active=0,g_5g_sampler_stop=0;
 static volatile unsigned int g_5g_samples=0,g_5g_get_changes=0,g_5g_put_changes=0;
+/* Stage 6V-A: passive FIFO stagnation observation only. No reset or buffer reuse. */
+static volatile unsigned long long g_6v_fifo_max_stagnant_us=0;
+static volatile unsigned int g_6v_fifo_stagnant_samples=0;
 static volatile u32 g_5g_get_first=0,g_5g_get_last=0,g_5g_put_first=0,g_5g_put_last=0;
 static volatile unsigned long long g_5g_start_us=0,g_5g_first_get_change_us=0,g_5g_last_get_change_us=0,g_5g_first_put_change_us=0;
 static sys_ppu_thread_t g_5g_thread=0;
 static void phase5g_sampler(void*){
- u32 pg=0,pp=0;int have=0;
+ u32 pg=0,pp=0;int have=0;unsigned long long last_get_progress_us=0;
  while(!g_5g_sampler_stop){
   if(g_5g_sample_active){
    gcmControlRegister *cr=gcmGetControlRegister();
    if(cr){u32 cg=cr->get,cp=cr->put;unsigned long long now=fps_now_us();
-    if(!have){pg=cg;pp=cp;g_5g_get_first=cg;g_5g_put_first=cp;have=1;}
-    if(cg!=pg){g_5g_get_changes++;if(!g_5g_first_get_change_us)g_5g_first_get_change_us=now;if(g_5g_start_us)g_5g_last_get_change_us=now;pg=cg;}
+    if(!have){pg=cg;pp=cp;g_5g_get_first=cg;g_5g_put_first=cp;last_get_progress_us=now;have=1;}
+    if(cg!=pg){last_get_progress_us=now;g_5g_get_changes++;if(!g_5g_first_get_change_us)g_5g_first_get_change_us=now;if(g_5g_start_us)g_5g_last_get_change_us=now;pg=cg;}
     if(cp!=pp){g_5g_put_changes++;if(!g_5g_first_put_change_us)g_5g_first_put_change_us=now;pp=cp;}
+    /* last_get_progress_us is updated in the GET-change branch above. */
+    /* GET!=PUT means queued work remains; a static GET is only a symptom, not proof of a hang. */
+    if(cg!=cp && last_get_progress_us && now>=last_get_progress_us){
+      unsigned long long stagnant=now-last_get_progress_us;
+      if(stagnant>g_6v_fifo_max_stagnant_us)g_6v_fifo_max_stagnant_us=stagnant;
+      if(stagnant>=100000ULL)g_6v_fifo_stagnant_samples++;
+    }
     g_5g_get_last=cg;g_5g_put_last=cp;g_5g_samples++;
    }
    usleep(100);
-  }else{have=0;usleep(200);}
+  }else{have=0;last_get_progress_us=0;usleep(200);}
  }
  sysThreadExit(0);
 }
