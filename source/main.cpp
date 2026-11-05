@@ -5994,11 +5994,22 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation L: repeat K without RSX/GCM linker wrappers.
-    Deliberately omit Flip to isolate CPU-side geometry submission. */
+ /* Isolation O: independently verify checkpoint persistence and vertex execution.
+    Do not infer GPU failure solely from a missing stdio checkpoint. */
  const char *diag="/dev_hdd0/tmp/ps3psu_gpu_diag.log";
+ const char *side="/dev_hdd0/tmp/ps3psu_gpu_diag_secondary.log";
  FILE *log=fopen(diag,"w");
- #define GPU_CHECKPOINT(msg) do { if(log){fprintf(log,"%s\\n",msg);fflush(log);fsync(fileno(log));} } while(0)
+ FILE *secondary=fopen(side,"w");
+ unsigned long diag_seq=0;
+ #define GPU_CHECKPOINT(msg) do { \
+   ++diag_seq; \
+   if(log){int wr=fprintf(log,"%lu %s\\n",diag_seq,msg);int fl=fflush(log);int sy=fsync(fileno(log));(void)wr;(void)fl;(void)sy;} \
+   if(secondary){int wr2=fprintf(secondary,"%lu %s\\n",diag_seq,msg);int fl2=fflush(secondary);int sy2=fsync(fileno(secondary));(void)wr2;(void)fl2;(void)sy2;} \
+ } while(0)
+ GPU_CHECKPOINT("O00 BUILD isolation-o-dual-log; independent file descriptors");
+ GPU_CHECKPOINT("O01 LOG CONTROL BEFORE HARMLESS CALL");
+ {volatile unsigned long x=diag_seq; x+=1; (void)x;}
+ GPU_CHECKPOINT("O02 LOG CONTROL AFTER HARMLESS CALL");
  GPU_CHECKPOINT("I00 ENTER MAIN");
  GPU_CHECKPOINT("I01 BEFORE VIDEO INIT");
  if(video_init()!=0){GPU_CHECKPOINT("I02 VIDEO INIT FAILED");if(log)fclose(log);return 2;}
@@ -6040,6 +6051,7 @@ int main(){
  shutdown_video();
  GPU_CHECKPOINT("I19 AFTER SHUTDOWN - RETURNING XMB");
  if(log)fclose(log);
+ if(secondary)fclose(secondary);
  return 0;
  if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_sampler,NULL,1500,0x4000,0,(char*)"psu_5g_fifo");ioPadInit(7);atexit(shutdown_video);sysUtilRegisterCallback(0,sysutil_cb,NULL);load_settings();catalogue_load_cache();set_device_default_path("/dev_hdd0");refresh_fs();game_db_auto_check();g_last_user_activity_us=fps_now_us();enum{B_UP=1<<0,B_DOWN=1<<1,B_CROSS=1<<2,B_CIRCLE=1<<3,B_SQUARE=1<<4,B_TRIANGLE=1<<5,B_SELECT=1<<6,B_START=1<<7,B_L1=1<<8,B_R1=1<<9,B_LEFT=1<<10,B_RIGHT=1<<11,B_L2=1<<12,B_R2=1<<13,B_R3=1<<14,B_L3=1<<15};padInfo pi;padData pd;u16 prev=0;while(running){
  sysUtilCheckCallback();
