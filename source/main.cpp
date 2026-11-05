@@ -5993,26 +5993,49 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation H: direct Tiny3D triangle without application's RSX rectangle batch. */
- if(video_init()!=0)return 2;
+ /* Startup isolation I: persistent checkpoints around Tiny3D geometry calls.
+    Deliberately omit Flip to isolate CPU-side geometry submission. */
+ const char *diag="/dev_hdd0/tmp/ps3psu_gpu_diag.log";
+ FILE *log=fopen(diag,"w");
+ #define GPU_CHECKPOINT(msg) do { if(log){fprintf(log,"%s\\n",msg);fflush(log);fsync(fileno(log));} } while(0)
+ GPU_CHECKPOINT("I00 ENTER MAIN");
+ GPU_CHECKPOINT("I01 BEFORE VIDEO INIT");
+ if(video_init()!=0){GPU_CHECKPOINT("I02 VIDEO INIT FAILED");if(log)fclose(log);return 2;}
+ GPU_CHECKPOINT("I02 AFTER VIDEO INIT");
  ioPadInit(7);
  sysUtilRegisterCallback(0,sysutil_cb,NULL);
  load_settings();
  catalogue_load_cache();
  set_device_default_path("/dev_hdd0");
  refresh_fs();
- /* Exercise Tiny3D's basic GPU submission and synchronized presentation only. */
+ GPU_CHECKPOINT("I03 AFTER SYNC STARTUP");
+ GPU_CHECKPOINT("I04 BEFORE CLEAR");
  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+ GPU_CHECKPOINT("I05 AFTER CLEAR");
+ GPU_CHECKPOINT("I06 BEFORE PROJECT2D");
  tiny3d_Project2D();
+ GPU_CHECKPOINT("I07 AFTER PROJECT2D");
+ GPU_CHECKPOINT("I08 BEFORE SETPOLYGON");
  tiny3d_SetPolygon(TINY3D_TRIANGLES);
+ GPU_CHECKPOINT("I09 AFTER SETPOLYGON");
+ GPU_CHECKPOINT("I10 BEFORE VERTEX 1");
  tiny3d_VertexPos(160.0f,100.0f,0.0f);tiny3d_VertexColor(0xFF0000FFu);
+ GPU_CHECKPOINT("I11 AFTER VERTEX 1");
+ GPU_CHECKPOINT("I12 BEFORE VERTEX 2");
  tiny3d_VertexPos(450.0f,100.0f,0.0f);tiny3d_VertexColor(0x00FF00FFu);
+ GPU_CHECKPOINT("I13 AFTER VERTEX 2");
+ GPU_CHECKPOINT("I14 BEFORE VERTEX 3");
  tiny3d_VertexPos(300.0f,330.0f,0.0f);tiny3d_VertexColor(0x0000FFFFu);
+ GPU_CHECKPOINT("I15 AFTER VERTEX 3");
+ GPU_CHECKPOINT("I16 BEFORE END");
  tiny3d_End();
- tiny3d_Flip();
+ GPU_CHECKPOINT("I17 AFTER END - FLIP INTENTIONALLY SKIPPED");
+ GPU_CHECKPOINT("I18 BEFORE SHUTDOWN");
  sysUtilUnregisterCallback(0);
  ioPadEnd();
  shutdown_video();
+ GPU_CHECKPOINT("I19 AFTER SHUTDOWN - RETURNING XMB");
+ if(log)fclose(log);
  return 0;
  if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_sampler,NULL,1500,0x4000,0,(char*)"psu_5g_fifo");ioPadInit(7);atexit(shutdown_video);sysUtilRegisterCallback(0,sysutil_cb,NULL);load_settings();catalogue_load_cache();set_device_default_path("/dev_hdd0");refresh_fs();game_db_auto_check();g_last_user_activity_us=fps_now_us();enum{B_UP=1<<0,B_DOWN=1<<1,B_CROSS=1<<2,B_CIRCLE=1<<3,B_SQUARE=1<<4,B_TRIANGLE=1<<5,B_SELECT=1<<6,B_START=1<<7,B_L1=1<<8,B_R1=1<<9,B_LEFT=1<<10,B_RIGHT=1<<11,B_L2=1<<12,B_R2=1<<13,B_R3=1<<14,B_L3=1<<15};padInfo pi;padData pd;u16 prev=0;while(running){
  sysUtilCheckCallback();
