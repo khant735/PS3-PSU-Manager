@@ -408,24 +408,24 @@ static inline u32 phase5c_delta(u32 a,u32 b){return b>=a?b-a:0;}
    was not present in the user-confirmed 4N stable build and is reverted here
    while retaining passive FIFO diagnostics. */
 static u32 g_5h_cmd_requested=0,g_5h_cmd_effective=0;
-extern "C" void *__real_rsxtiny_Init(u32,u32,const void*);
+extern "C" void *rsxtiny_Init(u32,u32,const void*);
 extern "C" void *__wrap_rsxtiny_Init(u32 cmdSize,u32 ioSize,const void *ioAddress){
  g_5h_cmd_requested=cmdSize;
  u32 effective=cmdSize;
  g_5h_cmd_effective=effective;
- return __real_rsxtiny_Init(effective,ioSize,ioAddress);
+ return rsxtiny_Init(effective,ioSize,ioAddress);
 }
 
-extern "C" u32 __real_gcmGetFlipStatus(void);
-extern "C" void __real_gcmResetFlipStatus(void);
-extern "C" s32 __real_gcmSetFlip(gcmContextData*,const u8);
-extern "C" void __real_gcmSetWaitFlip(gcmContextData*);
-extern "C" void __real_gcmSetFlipMode(const u32);
+extern "C" u32 gcmGetFlipStatus(void);
+extern "C" void gcmResetFlipStatus(void);
+extern "C" s32 gcmSetFlip(gcmContextData*,const u8);
+extern "C" void gcmSetWaitFlip(gcmContextData*);
+extern "C" void gcmSetFlipMode(const u32);
 static inline u8 phase5n_display_id(){u8 id=0xFF;return gcmGetCurrentDisplayBufferId(&id)==0?id:0xFF;}
-extern "C" void __wrap_gcmSetFlipMode(const u32 mode){g_5n_flip_mode=mode;__real_gcmSetFlipMode(mode);}
+extern "C" void __wrap_gcmSetFlipMode(const u32 mode){g_5n_flip_mode=mode;gcmSetFlipMode(mode);}
 extern "C" u32 __wrap_gcmGetFlipStatus(void){
  unsigned long long t=fps_now_us();
- u32 st=__real_gcmGetFlipStatus();
+ u32 st=gcmGetFlipStatus();
  if(g_4x_probe_active){
   if(!g_4x_first_status_us){g_4x_first_status_us=t;g_5k_poll_first=st;g_5k_poll_first_us=t;g_5l_vb_next_entry=gcmGetVBlankCount();g_5l_seen_first_poll=1;g_5n_disp_n=phase5n_display_id();}
   if(st==0 && !g_5l_vb_zero){g_5l_vb_zero=gcmGetVBlankCount();g_5n_disp_z=phase5n_display_id();}
@@ -435,12 +435,12 @@ extern "C" u32 __wrap_gcmGetFlipStatus(void){
  return st;
 }
 extern "C" void __wrap_gcmResetFlipStatus(void){
- __real_gcmResetFlipStatus(); if(g_4x_probe_active)g_4x_reset_us=fps_now_us();
+ gcmResetFlipStatus(); if(g_4x_probe_active)g_4x_reset_us=fps_now_us();
 }
 extern "C" s32 __wrap_gcmSetFlip(gcmContextData *c,const u8 b){
  if(g_4x_probe_active)g_4x_queue_begin_us=fps_now_us();
  u8 dq=phase5n_display_id();
- s32 r=__real_gcmSetFlip(c,b);
+ s32 r=gcmSetFlip(c,b);
  if(g_4x_probe_active){
   g_4x_queue_end_us=fps_now_us();g_4x_queue_rc=(int)r;g_5l_vb_queue=gcmGetVBlankCount();
   if(r==0){g_5n_pending_q_id=b;g_5n_pending_q_vb=g_5l_vb_queue;g_5n_pending_disp_q=dq;}
@@ -448,13 +448,13 @@ extern "C" s32 __wrap_gcmSetFlip(gcmContextData *c,const u8 b){
 }
 extern "C" void __wrap_gcmSetWaitFlip(gcmContextData *c){
  if(g_4x_probe_active)g_4x_waitcmd_begin_us=fps_now_us();
- __real_gcmSetWaitFlip(c);
+ gcmSetWaitFlip(c);
  if(g_4x_probe_active){
   g_4x_waitcmd_end_us=fps_now_us();g_5l_vb_waitcmd=gcmGetVBlankCount();
   g_5n_pending_w_vb=g_5l_vb_waitcmd;g_5n_pending_disp_w=phase5n_display_id();
  }
 }
-extern "C" s32 __real_tiny_rsxContextCallback(gcmContextData*,u32);
+extern "C" s32 tiny_rsxContextCallback(gcmContextData*,u32);
 extern "C" s32 __wrap_tiny_rsxContextCallback(gcmContextData *c,u32 count){
  unsigned long long b=0; gcmControlRegister *cr=NULL;
  unsigned long long draw_b=0; int draw_stage=-1;
@@ -468,7 +468,7 @@ extern "C" s32 __wrap_tiny_rsxContextCallback(gcmContextData *c,u32 count){
    g_5b_linear_free0=(c->end>=c->current)?(u32)((c->end-c->current)*4):0;
   }
  }
- s32 r=__real_tiny_rsxContextCallback(c,count);
+ s32 r=tiny_rsxContextCallback(c,count);
  if(draw_b&&draw_stage>=0&&draw_stage<7)g_5c_cb_us[draw_stage]+=fps_now_us()-draw_b;
  if(g_4x_probe_active){
   unsigned long long e=fps_now_us();g_5b_cb_us+=(e-b);cr=gcmGetControlRegister();
@@ -480,7 +480,7 @@ extern "C" s32 __wrap_tiny_rsxContextCallback(gcmContextData *c,u32 count){
  }
  return r;
 }
-extern "C" void __real_rsxtiny_MakeCmdSpace(void*,u32);
+extern "C" void rsxtiny_MakeCmdSpace(void*,u32);
 extern "C" void __wrap_rsxtiny_MakeCmdSpace(void *c,u32 space){
  unsigned int slot=0xFFFFFFFFu;
  if(g_4x_probe_active){
@@ -488,22 +488,22 @@ extern "C" void __wrap_rsxtiny_MakeCmdSpace(void *c,u32 space){
   slot=g_5a_space_count++;
   if(slot<8){g_5a_space_beg[slot]=g_4y_space_begin_us;g_5a_space_bytes[slot]=space;g_5e_space_off_beg[slot]=phase5e_ctx_off(c);}
  }
- __real_rsxtiny_MakeCmdSpace(c,space);
+ rsxtiny_MakeCmdSpace(c,space);
  if(g_4x_probe_active){
   g_4y_space_end_us=fps_now_us();
   if(slot<8){g_5a_space_end[slot]=g_4y_space_end_us;g_5e_space_off_end[slot]=phase5e_ctx_off(c);}
  }
 }
-extern "C" void __real_setupRenderTarget(int);
+extern "C" void setupRenderTarget(int);
 extern "C" void __wrap_setupRenderTarget(int b){
  if(g_4x_probe_active){g_4y_target_begin_us=fps_now_us();g_5f_target_off0=phase5e_ctx_off(g_ctx);}
- __real_setupRenderTarget(b);
+ setupRenderTarget(b);
  if(g_4x_probe_active){g_4y_target_end_us=fps_now_us();g_5f_target_off1=phase5e_ctx_off(g_ctx);}
 }
-extern "C" s32 __real_sysUtilCheckCallback(void);
+extern "C" s32 sysUtilCheckCallback(void);
 extern "C" s32 __wrap_sysUtilCheckCallback(void){
  if(g_4x_probe_active){g_4y_cb_begin_us=fps_now_us();g_5f_callback_off0=phase5e_ctx_off(g_ctx);}
- s32 r=__real_sysUtilCheckCallback();
+ s32 r=sysUtilCheckCallback();
  if(g_4x_probe_active){g_4y_cb_end_us=fps_now_us();g_5f_callback_off1=phase5e_ctx_off(g_ctx);}
  return r;
 }
