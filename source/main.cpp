@@ -5994,7 +5994,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation K: repeat J with Apollo-sized 1 MiB Tiny3D vertex buffer.
+ /* Startup isolation L: repeat K without RSX/GCM linker wrappers.
     Deliberately omit Flip to isolate CPU-side geometry submission. */
  const char *diag="/dev_hdd0/tmp/ps3psu_gpu_diag.log";
  FILE *log=fopen(diag,"w");
