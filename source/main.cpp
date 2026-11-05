@@ -472,7 +472,7 @@ extern "C" s32 __wrap_tiny_rsxContextCallback(gcmContextData *c,u32 count){
  if(g_4x_probe_active){
   b=fps_now_us(); g_5b_cb_count++; g_5b_cb_arg=count; cr=gcmGetControlRegister();
   if(g_5b_cb_count==1){
-   g_5g_samples=g_5g_get_changes=g_5g_put_changes=0;g_5g_first_get_change_us=g_5g_last_get_change_us=g_5g_first_put_change_us=0;g_5g_start_us=b;g_5g_sample_active=1;
+   g_5g_samples=g_5g_get_changes=g_5g_put_changes=0;g_6v_fifo_max_stagnant_us=0;g_6v_fifo_stagnant_samples=0;g_5g_first_get_change_us=g_5g_last_get_change_us=g_5g_first_put_change_us=0;g_5g_start_us=b;g_5g_sample_active=1;
    if(cr){g_5b_put0=cr->put;g_5b_get0=cr->get;}
    u32 off=0;if(c && c->current && gcmAddressToOffset(c->current,&off)==0)g_5b_cur_off0=off;
    g_5b_linear_free0=(c && c->end && c->current && c->end>=c->current)?(u32)((c->end-c->current)*4):0;
