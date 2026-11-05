@@ -1,0 +1,213 @@
+name: PS3 PSU Manager — Startup Isolation N
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [stage6v-startup-isolation-n-vertex-disasm]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    container:
+      image: hldtux/ps3dev:latest
+    env:
+      PS3DEV: /usr/local/ps3dev
+      PSL1GHT: /usr/local/ps3dev/psl1ght
+    steps:
+      - name: Checkout exact source commit without third-party actions
+        run: |
+          set -eu
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+          test -f Makefile
+      - name: Locate PS3 toolchain
+        run: |
+          set -eu
+          for d in /usr/local/ps3dev /opt/ps3dev; do
+            if [ -f "$d/psl1ght/ppu_rules" ] || [ -f "$d/ppu_rules" ]; then
+              echo "PS3DEV=$d" >> "$GITHUB_ENV"
+              if [ -f "$d/psl1ght/ppu_rules" ]; then echo "PSL1GHT=$d/psl1ght" >> "$GITHUB_ENV"; else echo "PSL1GHT=$d" >> "$GITHUB_ENV"; fi
+              echo "$d/bin" >> "$GITHUB_PATH"
+              echo "$d/ppu/bin" >> "$GITHUB_PATH"
+              exit 0
+            fi
+          done
+          echo 'ERROR: PSL1GHT ppu_rules missing from builder image' >&2
+          exit 1
+      - name: Run PS2 release-date merge regression tests
+        run: |
+          set -eu
+          python3 tests/test_release_date_merge.py
+      - name: Prepare complete offline PS2 title database
+        run: |
+          set -eu
+          python3 - <<'PY'
+          import json, re, urllib.request
+          from pathlib import Path
+          url='https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.titles.json'
+          request=urllib.request.Request(url,headers={'User-Agent':'PS3-PSU-Manager-CI/1.63'})
+          with urllib.request.urlopen(request,timeout=90) as response:
+              payload=response.read(16*1024*1024+1)
+          assert len(payload)<=16*1024*1024, 'GameDB source too large'
+          data=json.loads(payload)
+          assert isinstance(data,dict), 'Unexpected GameDB schema'
+          titles={key.upper():value for key,value in data.items()
+                  if isinstance(key,str) and re.fullmatch(r'[A-Za-z]{4}-[0-9]{5}',key)
+                  and isinstance(value,str) and value.strip() and len(value)<512}
+          assert len(titles)>=12000, f'Incomplete upstream database: {len(titles)} titles'
+          def clean(s):return s.replace('\\t',' ').replace('\\r',' ').replace('\\n',' ')
+          Path('PS2_GAME_TITLES.tsv').write_text(''.join(f'{key}\\t{clean(title)}\\n' for key,title in sorted(titles.items())),encoding='utf-8')
+          # GameDB complete JSON has per-serial {title,region,release_date} metadata.
+          # The titles-only file contains no release dates.
+          full_url='https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.data.json'
+          full_req=urllib.request.Request(full_url,headers={'User-Agent':'PS3-PSU-Manager-CI/1.63'})
+          with urllib.request.urlopen(full_req,timeout=90) as response:
+              full_payload=response.read(16*1024*1024+1)
+          assert len(full_payload)<=16*1024*1024,'GameDB metadata too large'
+          complete=json.loads(full_payload)
+          assert isinstance(complete,dict) and len(complete)>=12000,'Incomplete GameDB metadata'
+          def single(value):
+              if isinstance(value,list):return value[0].strip() if len(value)==1 and isinstance(value[0],str) else ''
+              return value.strip() if isinstance(value,str) else ''
+          def valid_date(value):
+              if re.fullmatch(r'\d{4}-\d{2}-\d{2}',value):
+                  import datetime
+                  try:datetime.date.fromisoformat(value);return 'day'
+                  except ValueError:return ''
+              if re.fullmatch(r'\d{4}-\d{2}',value):
+                  return 'month' if 1<=int(value[5:7])<=12 else ''
+              if re.fullmatch(r'\d{4}',value):return 'year'
+              return ''
+          source='https://github.com/niemasd/GameDB-PS2/releases/latest/download/PS2.data.json'
+          records=[]
+          dated=0
+          for serial,title in sorted(titles.items()):
+              meta=complete.get(serial,{})
+              if not isinstance(meta,dict):meta={}
+              region=single(meta.get('region',''))
+              date=single(meta.get('release_date',''))
+              precision=valid_date(date)
+              if not precision:date=''
+              if any(c in region for c in '\t\r\n'):region=''
+              if precision:dated+=1
+              records.append([serial,clean(title),clean(region),'','',date,
+                              precision if precision else 'unknown',source if precision else 'GameDB'])
+          # Sony confirms the regional date of the specific European disc.
+          for record in records:
+              if record[0]=='SCES-50294' and not record[5]:
+                  record[2]='PAL';record[5]='2001-07-20';record[6]='day'
+                  record[7]='https://www.gran-turismo.com/gb/products/gt3/'
+                  dated+=1
+          assert dated>100, f'Unexpectedly sparse GameDB release dates: {dated}'
+          Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv').write_text(
+              '# serial\ttitle\tregion\tedition\trevision\trelease_date\tdate_precision\tsource\n'+
+              ''.join('\t'.join(row)+'\n' for row in records),encoding='utf-8')
+          print(f'Bundling {len(titles)} titles and {dated} sourced release dates')
+          PY
+      - name: Merge reviewed supplemental PS2 release dates when present
+        run: |
+          set -eu
+          if [ -f data/ps2_release_candidates.tsv ]; then
+            python3 tools/merge_ps2_release_dates.py \
+              pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv \
+              data/ps2_release_candidates.tsv \
+              --output /tmp/PS2_GAME_TITLES.releases.merged.tsv \
+              --review /tmp/PS2_GAME_TITLES.releases.review.tsv
+            cp /tmp/PS2_GAME_TITLES.releases.merged.tsv pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv
+            python3 - <<'PY'
+          import csv
+          from pathlib import Path
+          path=Path('pkgfiles/USRDIR/PS2_GAME_TITLES.releases.tsv')
+          rows=[line.split('\\t') for line in path.read_text(encoding='utf-8').splitlines() if line and not line.startswith('#')]
+          assert len(rows)>=12000 and all(len(row)==8 for row in rows), 'Malformed enriched release database'
+          dated=sum(bool(row[5]) for row in rows)
+          assert dated>=100, 'Enriched database unexpectedly sparse'
+          print(f'Final release database: {len(rows)} serials, {dated} dated')
+          with Path('/tmp/PS2_GAME_TITLES.releases.review.tsv').open(encoding='utf-8',newline='') as stream:
+              review=list(csv.DictReader(stream,delimiter='\\t'))
+          print(f'Supplemental candidates requiring review: {len(review)}')
+          PY
+          else
+            echo 'No curated supplemental dates supplied; using GameDB-PS2 baseline'
+          fi
+      - name: Compile ELF and generate SELF / PKG
+        run: |
+          set -eux
+          make -j2
+          make pkg
+          test -s ps3psumanager.elf
+          test -s ps3psumanager.self
+          test -s ps3psumanager.pkg
+      - name: Audit exact linked Tiny3D archive and vertex implementation
+        run: |
+          set -eu
+          mkdir -p dist
+          {
+            echo "COMMIT=$GITHUB_SHA"
+            echo "PSL1GHT=$PSL1GHT"
+            echo "PS3DEV=$PS3DEV"
+            echo "Tiny3D candidate archives:"
+            find "$PS3DEV" -type f -name 'libtiny3d.a' -print 2>/dev/null
+          } > dist/TINY3D_AUDIT.txt
+          ARCHIVE="$(find "$PS3DEV" -type f -name 'libtiny3d.a' -print -quit 2>/dev/null)"
+          if [ -n "$ARCHIVE" ]; then
+            sha256sum "$ARCHIVE" >> dist/TINY3D_AUDIT.txt
+            powerpc64-ps3-elf-nm -A "$ARCHIVE" | grep -E 'tiny3d_VertexPos|tiny3d_Init|put_vertex' >> dist/TINY3D_AUDIT.txt || true
+            powerpc64-ps3-elf-objdump -dr "$ARCHIVE" > dist/TINY3D_DISASSEMBLY.txt
+          fi
+          powerpc64-ps3-elf-nm -n ps3psumanager.elf | grep -E 'tiny3d_VertexPos|tiny3d_Init|rsx_vertex|put_vertex' >> dist/TINY3D_AUDIT.txt || true
+          cat dist/TINY3D_AUDIT.txt
+      - name: Extract linked put_vertex and tiny3d_VertexPos instruction windows
+        run: |
+          set -eu
+          mkdir -p dist
+          powerpc64-ps3-elf-objdump -dr --start-address=0x1d2918 --stop-address=0x1d2b40 ps3psumanager.elf > dist/TINY3D_VERTEX_LINKED.txt
+          powerpc64-ps3-elf-nm -n ps3psumanager.elf | grep -E 'put_vertex|tiny3d_VertexPos|rsx_vertex|pos_rsx_vertex|size_rsx_vertex' >> dist/TINY3D_VERTEX_LINKED.txt
+          cat dist/TINY3D_VERTEX_LINKED.txt
+      - name: Package Stage 6V test artifacts
+        run: |
+          set -eu
+          mkdir -p dist
+          cp ps3psumanager.elf dist/PS3-PSU-Manager-Startup-Isolation-N.elf
+          cp ps3psumanager.self dist/PS3-PSU-Manager-Startup-Isolation-N.self
+          cp ps3psumanager.pkg dist/PS3-PSU-Manager-Startup-Isolation-N.pkg
+          git archive --format=zip -o dist/PS3-PSU-Manager-Startup-Isolation-N-SOURCE.zip HEAD
+          (cd dist && sha256sum *.elf *.self *.pkg *.zip TINY3D_*.txt > SHA256SUMS.txt)
+      - name: Install GitHub CLI if missing
+        run: |
+          set -eu
+          if ! command -v gh >/dev/null 2>&1; then
+            apt-get update -qq
+            apt-get install -y -qq gh
+          fi
+      - name: Publish isolated Stage 6V experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          TEST_TAG="startup-isolation-n-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          if gh release view "$TEST_TAG" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing prerelease $TEST_TAG" >&2
+            exit 1
+          fi
+          gh release create "$TEST_TAG" \
+            dist/PS3-PSU-Manager-Startup-Isolation-N.elf \
+            dist/PS3-PSU-Manager-Startup-Isolation-N.self \
+            dist/PS3-PSU-Manager-Startup-Isolation-N.pkg \
+            dist/PS3-PSU-Manager-Startup-Isolation-N-SOURCE.zip \
+            dist/TINY3D_AUDIT.txt \
+            dist/TINY3D_DISASSEMBLY.txt \
+            dist/TINY3D_VERTEX_LINKED.txt \
+            dist/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "Startup Isolation N experimental test $TEST_TAG" \
+            --notes "Isolation N Tiny3D binary audit; geometry test retained. Source: $GITHUB_SHA. Requires real PS3 testing; not stable." \
+            --prerelease
