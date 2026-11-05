@@ -2610,7 +2610,8 @@ static int video_init(){
     A/B build and writes into Tiny3D's inactive framebuffer. This removes our
     duplicate low-level RSX/display ownership before individual UI layers are
     migrated to GPU quads/font atlases in subsequent passes. */
- if(tiny3d_Init(16*1024*1024)!=0)return -1;
+ /* Isolation K: Apollo-matched 1 MiB vertex buffer; only allocation differs from J. */
+ if(tiny3d_Init(1024*1024)!=0)return -1;
  /* Match the proven Tiny3D viewport setup used by Apollo. Tiny3D's 2D
     coordinate system is 848x512; the viewport scales that virtual surface to
     the active PS3 output mode. */
@@ -5993,7 +5994,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation J: split the third vertex position and color checkpoints.
+ /* Startup isolation K: repeat J with Apollo-sized 1 MiB Tiny3D vertex buffer.
     Deliberately omit Flip to isolate CPU-side geometry submission. */
  const char *diag="/dev_hdd0/tmp/ps3psu_gpu_diag.log";
  FILE *log=fopen(diag,"w");
