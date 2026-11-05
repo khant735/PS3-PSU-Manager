@@ -188,6 +188,11 @@ jobs:
           mkdir -p dist
           powerpc64-ps3-elf-objdump -t ps3psumanager.elf | grep -E '([.]put_vertex|[.]tiny3d_VertexPos)' > dist/TINY3D_EXACT_CODE_SYMBOLS.txt || true
           powerpc64-ps3-elf-objdump -d ps3psumanager.elf | sed -n '/<\\.put_vertex>:/,/^$/p; /<\\.tiny3d_VertexPos>:/,/^$/p' > dist/TINY3D_EXACT_FUNCTIONS.txt
+          for report in dist/TINY3D_EXACT_CODE_SYMBOLS.txt dist/TINY3D_EXACT_FUNCTIONS.txt; do
+            if [ ! -s "$report" ]; then
+              printf 'No matching dot-prefixed symbol found in ELF symbol table; inspect .opd and full disassembly instead.\\n' > "$report"
+            fi
+          done
           cat dist/TINY3D_EXACT_CODE_SYMBOLS.txt
           cat dist/TINY3D_EXACT_FUNCTIONS.txt
       - name: Package Stage 6V test artifacts
