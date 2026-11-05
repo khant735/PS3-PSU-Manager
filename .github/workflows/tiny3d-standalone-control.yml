@@ -44,8 +44,11 @@ jobs:
           make -C tests/tiny3d_control -j2
           test -s tests/tiny3d_control/tiny3d_control.elf
           test -s tests/tiny3d_control/tiny3d_control.self
+          test -s tests/tiny3d_control/Tiny3D-Control.pkg
           cp tests/tiny3d_control/tiny3d_control.elf dist/Tiny3D-Control.elf
           cp tests/tiny3d_control/tiny3d_control.self dist/Tiny3D-Control.self
+          cp tests/tiny3d_control/Tiny3D-Control.pkg dist/Tiny3D-Control.pkg
+          cp tests/tiny3d_control/tiny3d_control.map dist/CONTROL_LINK_MAP.txt
           powerpc64-ps3-elf-nm -n dist/Tiny3D-Control.elf > dist/CONTROL_SYMBOLS.txt
           (cd dist && sha256sum * > SHA256SUMS.txt)
       - name: Upload test ELF SELF and dependency report
