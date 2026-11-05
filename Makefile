@@ -16,7 +16,7 @@ SFOXML := $(CURDIR)/assets/sfo.xml
 PKGFILES := $(CURDIR)/pkgfiles
 CFLAGS := -O1 -ffast-math -fno-math-errno -Wall -mcpu=cell $(MACHDEP) $(INCLUDE)
 CXXFLAGS := $(CFLAGS) -fno-exceptions -fno-rtti
-LDFLAGS := $(MACHDEP) -Wl,-Map,$(notdir $@).map -Wl,--wrap=rsxtiny_Init -Wl,--wrap=gcmGetFlipStatus -Wl,--wrap=gcmResetFlipStatus -Wl,--wrap=gcmSetFlip -Wl,--wrap=gcmSetWaitFlip -Wl,--wrap=gcmSetFlipMode -Wl,--wrap=rsxtiny_MakeCmdSpace -Wl,--wrap=tiny_rsxContextCallback -Wl,--wrap=setupRenderTarget -Wl,--wrap=sysUtilCheckCallback
+LDFLAGS := $(MACHDEP) -Wl,-Map,$(notdir $@).map
 LIBS := -lfont3d -ltiny3d -lfont -lcurl -lmbedtls -lmbedx509 -lmbedcrypto -lz -lnet -lnetctl -lsysmodule -lrsx -lgcm_sys -lio -lsysutil -lrt -llv2 -lm
 LIBDIRS := -L$(PSL1GHT)/portlibs/ppu/lib
 
