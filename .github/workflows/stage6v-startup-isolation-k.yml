@@ -3,7 +3,7 @@ name: PS3 PSU Manager — Startup Isolation K
 on:
   workflow_dispatch:
   push:
-    branches: [stage6v-startup-isolation-k-third-vertex]
+    branches: [stage6v-startup-isolation-k-1mb]
 
 permissions:
   contents: write
