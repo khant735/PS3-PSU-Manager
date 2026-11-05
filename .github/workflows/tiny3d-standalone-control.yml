@@ -4,7 +4,7 @@ on:
     branches: [research-tiny3d-crossproject-audit]
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 jobs:
   control:
     runs-on: ubuntu-24.04
@@ -51,8 +51,19 @@ jobs:
           cp tests/tiny3d_control/tiny3d_control.map dist/CONTROL_LINK_MAP.txt
           powerpc64-ps3-elf-nm -n dist/Tiny3D-Control.elf > dist/CONTROL_SYMBOLS.txt
           (cd dist && sha256sum * > SHA256SUMS.txt)
-      - name: Upload test ELF SELF and dependency report
-        uses: actions/upload-artifact@v4
-        with:
-          name: tiny3d-control-and-manifest
-          path: dist/
+      - name: Publish test artifacts without third-party actions
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          if ! command -v gh >/dev/null 2>&1; then
+            apt-get update -qq
+            apt-get install -y -qq gh
+          fi
+          TAG="tiny3d-control-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing tag $TAG" >&2
+            exit 1
+          fi
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "Tiny3D Control $TAG" --notes "Experimental standalone Tiny3D control. Not stable; requires real PS3 testing." --prerelease
