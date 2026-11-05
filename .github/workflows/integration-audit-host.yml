@@ -9,7 +9,13 @@ jobs:
   host-regression:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact commit using Git (no external action)
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
       - name: Check segmented libcurl write contract
         run: python3 tests/test_segmented_write_callback.py
       - name: Verify dependency inventory and package inputs
