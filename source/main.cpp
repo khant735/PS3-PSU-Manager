@@ -360,7 +360,7 @@ static u32 g_5e_between_bytes=0,g_5e_s1_inside_bytes=0,g_5e_s2_inside_bytes=0;
    position, not 17.9 KiB of generated commands. */
 static u32 g_5f_target_off0=0,g_5f_target_off1=0,g_5f_callback_off0=0,g_5f_callback_off1=0;
 static u32 g_5f_post_s1_to_target=0,g_5f_target_bytes=0,g_5f_callback_bytes=0,g_5f_after_callback_bytes=0;
-static inline u32 phase5e_ctx_off(void *vp){gcmContextData *c=(gcmContextData*)vp;u32 o=0;if(c&&c->current&&gcmAddressToOffset(c->current,&o)==0)return o;return 0;}
+static inline u32 phase5e_ctx_off(void *vp){gcmContextData *c=(gcmContextData*)vp;u32 o=0;if(c && c->current && gcmAddressToOffset(c->current,&o)==0)return o;return 0;}
 static inline u32 phase5e_forward_delta(u32 a,u32 b){return b>=a?b-a:0;}
 /* Phase 5B: inspect the command FIFO callback behind the slow 16 KiB request. */
 static unsigned int g_5b_cb_count=0;
@@ -464,8 +464,8 @@ extern "C" s32 __wrap_tiny_rsxContextCallback(gcmContextData *c,u32 count){
   if(g_5b_cb_count==1){
    g_5g_samples=g_5g_get_changes=g_5g_put_changes=0;g_5g_first_get_change_us=g_5g_last_get_change_us=g_5g_first_put_change_us=0;g_5g_start_us=b;g_5g_sample_active=1;
    if(cr){g_5b_put0=cr->put;g_5b_get0=cr->get;}
-   u32 off=0;if(gcmAddressToOffset(c->current,&off)==0)g_5b_cur_off0=off;
-   g_5b_linear_free0=(c->end>=c->current)?(u32)((c->end-c->current)*4):0;
+   u32 off=0;if(c && c->current && gcmAddressToOffset(c->current,&off)==0)g_5b_cur_off0=off;
+   g_5b_linear_free0=(c && c->end && c->current && c->end>=c->current)?(u32)((c->end-c->current)*4):0;
   }
  }
  s32 r=__real_tiny_rsxContextCallback(c,count);
@@ -474,8 +474,8 @@ extern "C" s32 __wrap_tiny_rsxContextCallback(gcmContextData *c,u32 count){
   unsigned long long e=fps_now_us();g_5b_cb_us+=(e-b);cr=gcmGetControlRegister();
   if(g_5b_cb_count==1){g_5g_sample_active=0;
    if(cr){g_5b_put1=cr->put;g_5b_get1=cr->get;}
-   u32 off=0;if(gcmAddressToOffset(c->current,&off)==0)g_5b_cur_off1=off;
-   g_5b_linear_free1=(c->end>=c->current)?(u32)((c->end-c->current)*4):0;
+   u32 off=0;if(c && c->current && gcmAddressToOffset(c->current,&off)==0)g_5b_cur_off1=off;
+   g_5b_linear_free1=(c && c->end && c->current && c->end>=c->current)?(u32)((c->end-c->current)*4):0;
   }
  }
  return r;
