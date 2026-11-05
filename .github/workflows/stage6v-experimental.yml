@@ -6,7 +6,7 @@ on:
     branches: [stage6v-diagnostic-guards-2201]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -154,10 +154,31 @@ jobs:
           cp ps3psumanager.pkg dist/PS3-PSU-Manager-Stage6V-A.pkg
           git archive --format=zip -o dist/PS3-PSU-Manager-Stage6V-A-SOURCE.zip HEAD
           (cd dist && sha256sum *.elf *.self *.pkg *.zip > SHA256SUMS.txt)
-      - name: Upload experimental build artifacts (not a release)
-        uses: actions/upload-artifact@v4
-        with:
-          name: PS3-PSU-Manager-Stage6V-A-${{ github.run_number }}
-          path: dist/*
-          if-no-files-found: error
-          retention-days: 14
+      - name: Install GitHub CLI if missing
+        run: |
+          set -eu
+          if ! command -v gh >/dev/null 2>&1; then
+            apt-get update -qq
+            apt-get install -y -qq gh
+          fi
+      - name: Publish isolated Stage 6V experimental prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          TEST_TAG="stage6v-a-test-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          if gh release view "$TEST_TAG" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing prerelease $TEST_TAG" >&2
+            exit 1
+          fi
+          gh release create "$TEST_TAG" \\
+            dist/PS3-PSU-Manager-Stage6V-A.elf \\
+            dist/PS3-PSU-Manager-Stage6V-A.self \\
+            dist/PS3-PSU-Manager-Stage6V-A.pkg \\
+            dist/PS3-PSU-Manager-Stage6V-A-SOURCE.zip \\
+            dist/SHA256SUMS.txt \\
+            --target "$GITHUB_SHA" \\
+            --title "Stage 6V-A experimental test $TEST_TAG" \\
+            --notes "Experimental RSX diagnostics build. Source: $GITHUB_SHA. Requires real PS3 testing; not stable." \\
+            --prerelease
