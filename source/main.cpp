@@ -5993,7 +5993,7 @@ static void game_db_auto_check(void){
 }
 
 int main(){
- /* Startup isolation F: minimal Tiny3D clear+flip, no application draw(), no sampler, no GameDB. */
+ /* Startup isolation G: one RSX rectangle via the application's batching path, then one Tiny3D flip. */
  if(video_init()!=0)return 2;
  ioPadInit(7);
  sysUtilRegisterCallback(0,sysutil_cb,NULL);
@@ -6003,6 +6003,9 @@ int main(){
  refresh_fs();
  /* Exercise Tiny3D's basic GPU submission and synchronized presentation only. */
  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+ tiny3d_Project2D();
+ rsx_ui_rect((int)g_width/4,(int)g_height/4,(int)g_width/2,(int)g_height/2,0xFF2070E0u);
+ rsx_flush_rect_batch();
  tiny3d_Flip();
  sysUtilUnregisterCallback(0);
  ioPadEnd();
