@@ -1,10 +1,12 @@
 PS3DEV ?= /usr/local/ps3dev
 PSL1GHT ?= $(PS3DEV)
+# Container sets PSL1GHT to PS3DEV root; use actual SDK root for headers.
+SDK_INC := $(if $(wildcard $(PSL1GHT)/ppu/include/sysutil/video.h),$(PSL1GHT)/ppu/include,$(PS3DEV)/ppu/include)
 CC := $(PS3DEV)/ppu/bin/powerpc64-ps3-elf-g++
 STRIP := $(PS3DEV)/ppu/bin/powerpc64-ps3-elf-strip
 TOOL := $(PS3DEV)/bin
 CONTENTID := UP0001-T3DC00001_00-0000000000000000
-CXXFLAGS := -O1 -ffast-math -fno-math-errno -mcpu=cell -fno-exceptions -fno-rtti -I$(PSL1GHT)/ppu/include -I$(PS3DEV)/portlibs/ppu/include
+CXXFLAGS := -O1 -ffast-math -fno-math-errno -mcpu=cell -fno-exceptions -fno-rtti -I$(SDK_INC) -I$(PS3DEV)/portlibs/ppu/include
 LIBS := -L$(PS3DEV)/portlibs/ppu/lib -L$(PSL1GHT)/ppu/lib -ltiny3d -lfont -lrsx -lgcm_sys -lio -lsysutil -lrt -llv2 -lm
 
 .PHONY: all clean
