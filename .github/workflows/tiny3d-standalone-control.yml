@@ -12,7 +12,7 @@ jobs:
       image: hldtux/ps3dev:latest
     env:
       PS3DEV: /usr/local/ps3dev
-      PSL1GHT: /usr/local/ps3dev/psl1ght
+      PSL1GHT: /usr/local/ps3dev
     steps:
       - name: Checkout
         run: |
