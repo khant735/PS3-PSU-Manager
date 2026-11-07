@@ -23,7 +23,7 @@ int main(void){
  assert(strcmp(entries[0].format,"PAGE")==0);
  assert(entries[0].download_url[0]==0);
  assert(strstr(entries[0].page_url,"/saves/987654")!=NULL);
- assert(gfs_index_save_pages(pages,"bad\\tgame","USA",entries,4)==-1);
+ assert(gfs_index_save_pages(pages,"bad\tgame","USA",entries,4)==-1);
  unsigned gid=0,sid=0;
  assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456",&gid,&sid));
  assert(!gfs_parse_save_page_ids("https://gamefaqs.gamespot.com/ps2/123456-",&gid,&sid));
