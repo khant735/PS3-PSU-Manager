@@ -3741,7 +3741,7 @@ static void draw(){
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;present();g_frame_counter++;return;
  }
- if(!(v6_done&(1u<<3))){
+ if(v6_scene()==3){
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
   tiny3d_Project2D();
   g_rsx_ui_overlay=1;
@@ -3752,7 +3752,7 @@ static void draw(){
  }
  /* Stage 6V Phase 6: high-contrast checkerboard, then full UI A/B.
     Both use the normal present()/tiny3d_Flip() path; no RSX sync changes. */
- if(!(v6_done&(1u<<4))){
+ if(v6_scene()==4){
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
   tiny3d_Project2D();g_rsx_ui_overlay=1;
   for(int y=0;y<8;y++)for(int x=0;x<12;x++)
