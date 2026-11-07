@@ -3719,6 +3719,21 @@ static void draw(){
  /* First diagnostic window: static background through normal Tiny3D flip.
     Scene ends only after v6_capture has marked its 30-second window done. */
  if(!v6_static_started){v6_static_started=1;v6_static_start_us=g_perf_draw_begin_us;}
+ /* Completion prompt appears only after the last CSV and summary are saved. */
+ const unsigned v6_required_mask=((1u<<18)-1u)&~((1u<<3)-1u);
+ if((v6_done&v6_required_mask)==v6_required_mask && !v6_pending){
+  g_v6_hide_text=0;
+  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+  tiny3d_Project2D();g_rsx_ui_overlay=1;
+  rsx_ui_rect(0,0,(int)g_width,(int)g_height,0xFF102235u);
+  rsx_ui_rect(30,(int)g_height/2-100,(int)g_width-60,200,0xFF183C56u);
+  rsx_ui_text_raw(52,(int)g_height/2-70,"ALL DIAGNOSTIC TESTS COMPLETE",0xFFFFFFFFu,2);
+  rsx_ui_text_raw(52,(int)g_height/2-12,"CSV AND SUMMARY FILES SAVED TO:",0xFFB5E6FFu,1);
+  rsx_ui_text_raw(52,(int)g_height/2+16,"/dev_hdd0/tmp/ps3psu_stage6v/",0xFFFFFFFFu,1);
+  rsx_ui_text_raw(52,(int)g_height/2+56,"PRESS PS BUTTON / HOME TO RETURN TO XMB",0xFFFFFF90u,1);
+  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
+  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
+ }
  if(!(v6_done&(1u<<3))){
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
   tiny3d_Project2D();
