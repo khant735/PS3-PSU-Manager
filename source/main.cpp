@@ -2675,6 +2675,8 @@ static char v6_icon[256]="";
 static u32 v6_pre_get=0,v6_pre_put=0,v6_post_get=0,v6_post_put=0,v6_buffer_before=0,v6_buffer_after=0;
 static int v6_scene(){
  if(v6_static_started && !(v6_done&(1u<<3)))return 3;
+ if(v6_static_started && !(v6_done&(1u<<4)))return 4;
+ if(v6_static_started && !(v6_done&(1u<<5)))return 5;
  if(g_options_active||g_psu_metadata_active||g_catalogue_active||
     g_download_progress_active||g_rename_active||g_delete_confirm_active||
     g_zip_confirm_active||g_apollo_warning_active)return 0;
@@ -2718,7 +2720,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":"static_scene";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":"full_ui_scene";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -3724,6 +3726,21 @@ static void draw(){
   present();g_frame_counter++;
   return;
  }
+ /* Stage 6V Phase 6: high-contrast checkerboard, then full UI A/B.
+    Both use the normal present()/tiny3d_Flip() path; no RSX sync changes. */
+ if(!(v6_done&(1u<<4))){
+  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+  tiny3d_Project2D();g_rsx_ui_overlay=1;
+  for(int y=0;y<8;y++)for(int x=0;x<12;x++)
+   rsx_ui_rect(x*(int)g_width/12,y*(int)g_height/8,
+     (int)g_width/12+1,(int)g_height/8+1,
+     ((x+y)&1)?0xFF101010u:0xFFEFEFEFu);
+  rsx_ui_rect(0,0,(int)g_width,60,0xFF122C48u);
+  rsx_ui_text_raw(20,16,"PHASE 6 - CHECKERBOARD - 30 SECONDS",0xFFFFFFFFu,2);
+  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
+  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
+ }
+ if(!(v6_done&(1u<<5)))g_ui_dirty=1;
  /* Details owns a complete deterministic RSX frame.  Do this before every
     legacy archive fast path so no software framebuffer renderer participates
     while the metadata modal is visible. */
@@ -4031,6 +4048,13 @@ static void draw(){
   g_model_buffer_generation[g_back]=g_model_generation;
  else g_model_buffer_generation[g_back]=0;
  g_ui_dirty=0; g_list_dirty=0;
+ if(!(v6_done&(1u<<5))){
+  g_rsx_ui_overlay=1;
+  rsx_ui_rect(0,0,(int)g_width,60,0xFF122C48u);
+  rsx_ui_text_raw(20,16,"PHASE 6 - FULL UI - 30 SECONDS",0xFFFFFFFFu,2);
+  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
+  g_rsx_ui_overlay=0;
+ }
  present();
  if(g_device_switch_redraw_frames>0){
   g_device_switch_redraw_frames--;
