@@ -694,6 +694,7 @@ static inline u32 rsx_rgba_from_argb(u32 c){
  u32 a=(c>>24)&255u, r=(c>>16)&255u, g=(c>>8)&255u, b=c&255u;
  return (r<<24)|(g<<16)|(b<<8)|a;
 }
+static void v6_note_upload(u32 bytes);
 static void rsx_flush_text_batch();
 static void rsx_flush_line_batch();
 #define RSX_LINE_BATCH_MAX 2048
