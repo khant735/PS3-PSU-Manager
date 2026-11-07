@@ -3835,9 +3835,9 @@ static void draw(){
      visible on real TVs with bottom-edge overscan.  Timing/presentation is
      otherwise identical to the stable 4Y/4N path. */
   char perf_break[224];
-  snprintf(perf_break,sizeof(perf_break),"5N BUF M%u Q%u D%u>%u H%u/R%u S%u N%u Z%u",
-   (unsigned)g_5n_flip_mode,(unsigned)g_5n_rep_q_id,(unsigned)g_5n_rep_disp_q,(unsigned)g_5n_rep_disp_w,
-   (unsigned)g_5n_rep_disp_h,(unsigned)g_5n_rep_render_h,(unsigned)g_5n_rep_same,(unsigned)g_5n_disp_n,(unsigned)g_5n_disp_z);
+  snprintf(perf_break,sizeof(perf_break),"6V STALL>100ms:%u MAX:%ums GET:%08X PUT:%08X",
+   (unsigned)g_6v_long_flip_count,(unsigned)(g_6v_max_flip_us/1000u),
+   (unsigned)g_6v_last_get,(unsigned)g_6v_last_put);
   char stage_break[224];
   snprintf(stage_break,sizeof(stage_break),"5N VB Q%llu H%llu N%llu Z%llu QH%lld HZ%lld",
    g_5n_rep_q_vb,g_5n_rep_h_vb,g_5l_vb_next_entry,g_5l_vb_zero,
