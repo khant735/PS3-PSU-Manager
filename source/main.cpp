@@ -2661,11 +2661,12 @@ static volatile u32 g_6v_last_get=0,g_6v_last_put=0;
 
 /* Stage 6V 30s dual capture: frame sampling is RAM-only; save after window. */
 #define V6_MAX 4096
-typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;} v6_row;
+typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;} v6_row;
 static v6_row v6_rows[V6_MAX];
 static unsigned v6_n=0,v6_active=0,v6_pending=0,v6_done=0,v6_overflow=0;
 static unsigned long long v6_begin=0,v6_prev=0;
 static char v6_icon[256]="";
+static u32 v6_pre_get=0,v6_pre_put=0,v6_post_get=0,v6_post_put=0,v6_buffer_before=0,v6_buffer_after=0;
 static int v6_scene(){
  if(g_options_active||g_psu_metadata_active||g_catalogue_active||
     g_download_progress_active||g_rename_active||g_delete_confirm_active||
@@ -2693,6 +2694,14 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
   p->draw=(u32)(before>=g_perf_draw_begin_us?before-g_perf_draw_begin_us:0);
   p->flip=(u32)(now-before);p->get=cr?cr->get:0;p->put=cr?cr->put:0;
   p->vb=vb;p->status=status;
+  p->pre_get=v6_pre_get;p->pre_put=v6_pre_put;p->post_get=v6_post_get;p->post_put=v6_post_put;
+  p->poll_us=(g_4x_first_status_us&&g_4x_reset_us&&g_4x_reset_us>=g_4x_first_status_us)?(u32)(g_4x_reset_us-g_4x_first_status_us):0;
+  p->queue_us=(g_4x_queue_begin_us&&g_4x_queue_end_us&&g_4x_queue_end_us>=g_4x_queue_begin_us)?(u32)(g_4x_queue_end_us-g_4x_queue_begin_us):0;
+  p->waitcmd_us=(g_4x_waitcmd_begin_us&&g_4x_waitcmd_end_us&&g_4x_waitcmd_end_us>=g_4x_waitcmd_begin_us)?(u32)(g_4x_waitcmd_end_us-g_4x_waitcmd_begin_us):0;
+  p->tail_us=(g_4x_waitcmd_end_us&&now>=g_4x_waitcmd_end_us)?(u32)(now-g_4x_waitcmd_end_us):0;
+  p->polls=g_4x_status_polls;p->callbacks=g_5b_cb_count;
+  p->buffer_before=v6_buffer_before;p->buffer_after=v6_buffer_after;
+  p->draw_bg_us=(u32)(g_perf_bg_ms*1000.0f);p->draw_list_us=(u32)(g_perf_list_ms*1000.0f);p->draw_preview_us=(u32)(g_perf_preview_ms*1000.0f);
  }else ++v6_overflow;
  v6_prev=now;
  if(now-v6_begin>=30000000ULL){
@@ -2712,15 +2721,17 @@ static void v6_save(){
  unsigned max_dt=0,max_flip=0,stalls=0;
  FILE *f=fopen(csv,"wb");
  if(f){
-  fprintf(f,"frame,interval_us,draw_us,flip_us,rsx_get,rsx_put,vblank_delta,flip_status\n");
+  fprintf(f,"frame,interval_us,draw_us,flip_us,rsx_get,rsx_put,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after,avg_bg_us,avg_list_us,avg_preview_us\n");
   for(unsigned i=0;i<v6_n;i++){
    const v6_row *p=&v6_rows[i];
    if(i){total_dt+=p->dt;if(p->dt>max_dt)max_dt=p->dt;}
    total_draw+=p->draw;total_flip+=p->flip;
    if(p->flip>max_flip)max_flip=p->flip;
    if(p->flip>100000)++stalls;
-   fprintf(f,"%u,%u,%u,%u,%08X,%08X,%u,%u\n",p->frame,p->dt,p->draw,
-           p->flip,p->get,p->put,p->vb,p->status);
+   fprintf(f,"%u,%u,%u,%u,%08X,%08X,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",p->frame,p->dt,p->draw,
+           p->flip,p->get,p->put,p->vb,p->status,p->pre_get,p->pre_put,p->post_get,p->post_put,
+           p->poll_us,p->queue_us,p->waitcmd_us,p->tail_us,p->polls,p->callbacks,
+           p->buffer_before,p->buffer_after,p->draw_bg_us,p->draw_list_us,p->draw_preview_us);
   }
   csv_ok=!ferror(f);if(fclose(f)!=0)csv_ok=0;
  }
@@ -2760,6 +2771,8 @@ static void present(){
     Time it separately: a stable ~30 FPS with a ~30 ms FLIP value proves the
     frame is missing alternate vblanks; a large DRAW value instead identifies
     CPU/RSX command construction as the bottleneck. */
+ {gcmControlRegister *cr=gcmGetControlRegister();v6_pre_get=cr?cr->get:0;v6_pre_put=cr?cr->put:0;}
+ v6_buffer_before=(u32)Video_currentBuffer;
  g_4x_flip_enter_us=before_flip; g_4x_first_status_us=0; g_4x_reset_us=0;
  g_4x_queue_begin_us=0; g_4x_queue_end_us=0; g_4x_waitcmd_begin_us=0; g_4x_waitcmd_end_us=0;
  g_4x_status_polls=0; g_5k_poll_nonzero=0;g_5k_poll_first=g_5k_poll_last=0;g_5k_poll_first_us=g_5k_poll_last_us=0;g_5l_vb_queue=g_5l_vb_waitcmd=g_5l_vb_next_entry=g_5l_vb_zero=0;g_5l_seen_first_poll=0;g_5n_disp_n=g_5n_disp_z=0xFF; g_4y_space_begin_us=g_4y_space_end_us=g_4y_target_begin_us=g_4y_target_end_us=g_4y_cb_begin_us=g_4y_cb_end_us=0;
@@ -2767,6 +2780,8 @@ static void present(){
  tiny3d_Flip();
  g_4x_probe_active=0;
  unsigned long long after_flip=fps_now_us();
+ {gcmControlRegister *cr=gcmGetControlRegister();v6_post_get=cr?cr->get:0;v6_post_put=cr?cr->put:0;}
+ v6_buffer_after=(u32)Video_currentBuffer;
  v6_capture(after_flip,before_flip,(unsigned)(g_vblank_count-vb_before),(unsigned)g_perf_flip_status_before);
  /* Capture only after the normal Tiny3D flip has returned. These counters
     are observational; do not attempt GPU recovery from the render thread. */
