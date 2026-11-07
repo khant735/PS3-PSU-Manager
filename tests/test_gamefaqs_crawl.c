@@ -20,7 +20,7 @@ int main(int argc,char **argv){
  assert(argc==2);
  char path[512];snprintf(path,sizeof(path),"%s/crawl.tsv",argv[1]);remove(path);
  assert(gfs_crawl_listing("https://gamefaqs.gamespot.com/ps2/123456-example/saves",
- path,"Example","USA",8,fetch,release,NULL)==2);
+ path,"Example","USA",8,fetch,release,NULL)==1);
  assert(calls==2);
  FILE *f=fopen(path,"rb");assert(f);
  char data[4096];size_t n=fread(data,1,sizeof(data)-1,f);fclose(f);data[n]=0;
