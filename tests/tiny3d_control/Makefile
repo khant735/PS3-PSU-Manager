@@ -26,7 +26,6 @@ Tiny3D-Control.pkg: tiny3d_control.self
 	cp $(TOOL)/ICON0.PNG stage/pkg/ICON0.PNG
 	$(TOOL)/sfo --title "Tiny3D Standalone Control" --appid T3DC00001 -f $(TOOL)/sfo.xml stage/pkg/PARAM.SFO
 	$(TOOL)/pkg --contentid $(CONTENTID) stage/pkg/ $@
-	cp $@ Tiny3D-Control.gnpdrm.pkg
-	$(TOOL)/package_finalize Tiny3D-Control.gnpdrm.pkg
+	$(TOOL)/package_finalize $@
 clean:
 	rm -rf main.o stage tiny3d_control.map tiny3d_control.elf tiny3d_control.self Tiny3D-Control.pkg Tiny3D-Control.gnpdrm.pkg
