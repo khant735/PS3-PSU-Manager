@@ -3153,7 +3153,7 @@ static void draw_cached_list_rows(){
  int visible=g_list_cache_visible;
  if(selected<top_index)top_index=selected;
  if(selected>=top_index+visible)top_index=selected-visible+1;
- for(int row=0;row<visible && v6_layer!=6;row++){
+ for(int row=0;row<visible;row++){
   int i=top_index+row; if(i>=item_count)break;
   draw_cached_list_row(i,row);
  }
@@ -3225,7 +3225,7 @@ static int draw_fast_list_update(){
   int saved=selected;selected=-1;
   for(int row=0;row<visible;row++){int i=top_index+row;if(i>=item_count)break;draw_cached_list_row(i,row);}selected=saved;
   capture_list_base(g_list_x-8,g_list_cache_rows_y-4,g_list_cache_right-(g_list_x-8)-12,visible*g_row_h+8);
-  if(v6_layer!=6&&selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
+  if(selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
   copy_region_between_buffers(g_list_panel_x,g_list_panel_y,g_list_panel_w,g_list_panel_h);
  }
  g_list_prev_selected=selected;
