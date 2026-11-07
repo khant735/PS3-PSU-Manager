@@ -801,8 +801,9 @@ static void rsx_flush_text_batch(){
  tiny3d_End();
  g_rsx_text_batch_count=0;
 }
+static int g_v6_hide_text=0;
 static void rsx_ui_text_raw(int x,int y,const char *s,u32 col,int scale){
- if(!s||!*s)return;
+ if(g_v6_hide_text||!s||!*s)return;
  rsx_flush_rect_batch();
  rsx_flush_line_batch();
  if(g_rsx_text_batch_count>=RSX_TEXT_BATCH_MAX)rsx_flush_text_batch();
@@ -2677,6 +2678,7 @@ static int v6_scene(){
  if(v6_static_started && !(v6_done&(1u<<3)))return 3;
  if(v6_static_started && !(v6_done&(1u<<4)))return 4;
  if(v6_static_started && !(v6_done&(1u<<5)))return 5;
+ for(int phase=6;phase<=9;phase++)if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
  if(g_options_active||g_psu_metadata_active||g_catalogue_active||
     g_download_progress_active||g_rename_active||g_delete_confirm_active||
     g_zip_confirm_active||g_apollo_warning_active)return 0;
@@ -2720,7 +2722,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":"full_ui_scene";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":"complete_ui";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -3151,7 +3153,7 @@ static void draw_cached_list_rows(){
  int visible=g_list_cache_visible;
  if(selected<top_index)top_index=selected;
  if(selected>=top_index+visible)top_index=selected-visible+1;
- for(int row=0;row<visible;row++){
+ for(int row=0;row<visible && v6_layer!=6;row++){
   int i=top_index+row; if(i>=item_count)break;
   draw_cached_list_row(i,row);
  }
@@ -3223,7 +3225,7 @@ static int draw_fast_list_update(){
   int saved=selected;selected=-1;
   for(int row=0;row<visible;row++){int i=top_index+row;if(i>=item_count)break;draw_cached_list_row(i,row);}selected=saved;
   capture_list_base(g_list_x-8,g_list_cache_rows_y-4,g_list_cache_right-(g_list_x-8)-12,visible*g_row_h+8);
-  if(selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
+  if(v6_layer!=6&&selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
   copy_region_between_buffers(g_list_panel_x,g_list_panel_y,g_list_panel_w,g_list_panel_h);
  }
  g_list_prev_selected=selected;
@@ -3740,6 +3742,10 @@ static void draw(){
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;present();g_frame_counter++;return;
  }
+ int v6_layer=0;
+ if(v6_done&(1u<<5))for(int phase=6;phase<=9;phase++)if(!(v6_done&(1u<<phase))){v6_layer=phase;break;}
+ g_v6_hide_text=(v6_layer==6||v6_layer==7);
+ if(v6_layer)g_ui_dirty=1;
  if(!(v6_done&(1u<<5)))g_ui_dirty=1;
  /* Details owns a complete deterministic RSX frame.  Do this before every
     legacy archive fast path so no software framebuffer renderer participates
@@ -3944,7 +3950,7 @@ static void draw(){
  g_list_prev_selected=selected;
  g_list_prev_top=top_index;
  perf_t1=fps_now_us(); perf_avg(&g_perf_list_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[3]=phase5c_cmd_off(); g_5c_stage=3;
- if(archive_mode){
+ if(archive_mode && (!v6_layer||v6_layer==9)){
   /* Start the preview below the Explorer folder/header tab instead of beside it. */
   int panel_y=rows_y;
   int panel_h=footer_y-panel_y-12; if(panel_h<160)panel_h=160;
@@ -4048,10 +4054,15 @@ static void draw(){
   g_model_buffer_generation[g_back]=g_model_generation;
  else g_model_buffer_generation[g_back]=0;
  g_ui_dirty=0; g_list_dirty=0;
- if(!(v6_done&(1u<<5))){
-  g_rsx_ui_overlay=1;
+ if(!(v6_done&(1u<<5))||v6_layer){
+  g_v6_hide_text=0;g_rsx_ui_overlay=1;
   rsx_ui_rect(0,0,(int)g_width,60,0xFF122C48u);
-  rsx_ui_text_raw(20,16,"PHASE 6 - FULL UI - 30 SECONDS",0xFFFFFFFFu,2);
+  const char *label=v6_layer==6?"PHASE 7 - PANELS - 30 SECONDS":
+    v6_layer==7?"PHASE 7 - PANELS + ROWS - 30 SECONDS":
+    v6_layer==8?"PHASE 7 - ROWS + TEXT - 30 SECONDS":
+    v6_layer==9?"PHASE 7 - COMPLETE UI - 30 SECONDS":
+    "PHASE 6 - FULL UI - 30 SECONDS";
+  rsx_ui_text_raw(20,16,label,0xFFFFFFFFu,2);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;
  }
