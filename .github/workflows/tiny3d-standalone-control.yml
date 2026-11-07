@@ -1,0 +1,11 @@
+name: PS3 PSU Manager — Verified Tiny3D Toolchain Control
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  control:
+    if: github.ref == 'refs/heads/research-tiny3d-crossproject-audit'
+    uses: khant735/PS3-PSU-Manager/.github/workflows/tiny3d-standalone-control.yml@research-tiny3d-crossproject-audit
+    permissions:
+      contents: write
