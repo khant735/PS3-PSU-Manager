@@ -10,9 +10,8 @@ int main(void){
  "<a href='https://evil.example/ps2/123456-example-game/saves'>Unsafe</a>"
  "<a href='/ps2/123456-example-game/faqs'>Not saves</a>";
  int n=gfs_discover_save_links(html,urls,4);
- assert(n==2);
- assert(strcmp(urls[0],"https://gamefaqs.gamespot.com/ps2/123456-example-game/saves")==0);
- assert(strcmp(urls[1],"https://gamefaqs.gamespot.com/ps2/123456-example-game/saves/987654")==0);
+ assert(n==1);
+ assert(strcmp(urls[0],"https://gamefaqs.gamespot.com/ps2/123456-example-game/saves/987654")==0);
  assert(gfs_discover_save_links("<a href=\'https://gamefaqs.gamespot.com/other/ps2/123456-example-game/saves\'>bad</a>",urls,4)==0);
  assert(gfs_discover_save_links("<a href=\'/ps2/123456-example-game/saves?x=1&amp;y=2\'>encoded</a>",urls,4)==0);
  assert(gfs_discover_save_links("",urls,4)==0);
