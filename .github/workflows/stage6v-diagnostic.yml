@@ -2,13 +2,16 @@ name: Stage 6V — Audited diagnostic build (artifacts only)
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - stage6v-phase2-observation-only
 
 permissions:
   contents: write
 
 jobs:
   diagnostic:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage6v-phase2-observation-only'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     env:
