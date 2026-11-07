@@ -1,0 +1,72 @@
+name: Stage 6V — Audited diagnostic build (artifacts only)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnostic:
+    if: github.ref == 'refs/heads/stage6v-phase2-observation-only'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      PS3DEV: /opt/ps3dev
+      PSL1GHT: /opt/ps3dev
+      EXPECTED_TINY3D_SHA256: f048395e10e4cb60632d4430d99bf376d9ccf60efe8ad6a24c6c9c8c19434194
+      EXPECTED_TOOLCHAIN_SHA256: 034747ab869247ffed67b50a8776779bb7ac65fe1a9ebc0a58a0058aab6f8710
+      EXPECTED_COMPILER_SHA256: 95f8f0a463c0a68177ada128273ec026481ec0b31fce3481c74e0eccb7e12e88
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install extraction prerequisites
+        run: sudo apt-get update && sudo apt-get install -y zstd curl
+      - name: Download audited PS3DEV archives
+        env:
+          TOOLCHAIN_URL: ${{ vars.STAGE6V_TOOLCHAIN_URL }}
+          COMPILER_URL: ${{ vars.STAGE6V_COMPILER_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$TOOLCHAIN_URL" || { echo "::error::Set repository variable STAGE6V_TOOLCHAIN_URL"; exit 1; }
+          test -n "$COMPILER_URL" || { echo "::error::Set repository variable STAGE6V_COMPILER_URL"; exit 1; }
+          curl --fail --location --retry 3 --proto '=https' --tlsv1.2 "$TOOLCHAIN_URL" -o /tmp/ps3dev-toolchain.tar.zst
+          curl --fail --location --retry 3 --proto '=https' --tlsv1.2 "$COMPILER_URL" -o /tmp/ps3dev-compiler.tar.zst
+          echo "$EXPECTED_TOOLCHAIN_SHA256  /tmp/ps3dev-toolchain.tar.zst" | sha256sum -c -
+          echo "$EXPECTED_COMPILER_SHA256  /tmp/ps3dev-compiler.tar.zst" | sha256sum -c -
+      - name: Extract and verify audited Tiny3D
+        run: |
+          set -euo pipefail
+          sudo tar --zstd -xf /tmp/ps3dev-toolchain.tar.zst -C /opt
+          sudo tar --zstd -xf /tmp/ps3dev-compiler.tar.zst -C /opt
+          echo "$EXPECTED_TINY3D_SHA256  $PS3DEV/portlibs/ppu/lib/libtiny3d.a" | sha256sum -c -
+          test -f "$PSL1GHT/ppu_rules"
+          test -x "$PS3DEV/ppu/bin/ppu-g++"
+      - name: Build ELF SELF PKG
+        env:
+          PATH: /opt/ps3dev/bin:/opt/ps3dev/ppu/bin:/usr/local/bin:/usr/bin:/bin
+        run: |
+          set -euo pipefail
+          make clean
+          make -j2
+          make pkg
+          test -s ps3psumanager.elf
+          test -s ps3psumanager.self
+          test -s ps3psumanager.pkg
+      - name: Package source snapshot
+        run: |
+          git archive --format=zip --output=stage6v-phase2-source.zip HEAD
+          sha256sum ps3psumanager.elf ps3psumanager.self ps3psumanager.pkg stage6v-phase2-source.zip > SHA256SUMS.txt
+      - name: Upload diagnostic artifacts (no release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: stage6v-phase2-${{ github.run_number }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            ps3psumanager.elf
+            ps3psumanager.self
+            ps3psumanager.pkg
+            stage6v-phase2-source.zip
+            SHA256SUMS.txt
