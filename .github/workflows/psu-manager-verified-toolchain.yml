@@ -1,0 +1,78 @@
+name: PS3 PSU Manager — Experimental Verified Toolchain Build
+on:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PS3DEV: /usr/local/ps3dev
+      PSL1GHT: /usr/local/ps3dev
+    steps:
+      - name: Checkout experimental source without third-party actions
+        run: |
+          set -euo pipefail
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+      - name: Install host dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd curl ca-certificates libgmp10 libmpfr6 libmpc3 libelf-dev
+      - name: Download and authenticate known-working PS3 toolchain
+        run: |
+          set -euo pipefail
+          curl -fL --retry 3 --max-time 1200 'https://github.com/khant735/PS3-PSU-Manager/releases/download/ps3dev-verified-toolchain/ps3dev_psl1ght_full_toolchain.tar.zst' -o sdk.tar.zst
+          curl -fL --retry 3 --max-time 1200 'https://github.com/khant735/PS3-PSU-Manager/releases/download/ps3dev-verified-toolchain/ps3dev_ppu_compiler_cgcomp.tar.zst' -o compiler.tar.zst
+          echo '034747ab869247ffed67b50a8776779bb7ac65fe1a9ebc0a58a0058aab6f8710  sdk.tar.zst' | sha256sum -c -
+          echo '95f8f0a463c0a68177ada128273ec026481ec0b31fce3481c74e0eccb7e12e88  compiler.tar.zst' | sha256sum -c -
+          sudo tar --zstd -xf sdk.tar.zst -C /usr/local
+          sudo tar --zstd -xf compiler.tar.zst -C /usr/local
+          sudo chmod -R a+rX /usr/local/ps3dev
+          test -x "$PS3DEV/ppu/bin/powerpc64-ps3-elf-g++"
+          test -f "$PS3DEV/portlibs/ppu/lib/libtiny3d.a"
+      - name: Run host regression tests
+        run: |
+          set -euo pipefail
+          make host-test
+      - name: Compile full PS3 PSU Manager
+        run: |
+          set -euo pipefail
+          make clean
+          make -j2
+          make pkg
+      - name: Verify and prepare build artifacts
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          test -s ps3psumanager.elf
+          test -s ps3psumanager.self
+          test -s ps3psumanager.pkg
+          cp ps3psumanager.elf dist/
+          cp ps3psumanager.self dist/
+          cp ps3psumanager.pkg dist/
+          git archive --format=zip --output=dist/PS3-PSU-Manager-experimental-source.zip HEAD
+          {
+            echo "commit=${GITHUB_SHA}"
+            echo "sdk_sha256=034747ab869247ffed67b50a8776779bb7ac65fe1a9ebc0a58a0058aab6f8710"
+            echo "compiler_sha256=95f8f0a463c0a68177ada128273ec026481ec0b31fce3481c74e0eccb7e12e88"
+            "$PS3DEV/ppu/bin/powerpc64-ps3-elf-g++" --version | head -1
+          } > dist/BUILD_MANIFEST.txt
+          (cd dist && sha256sum ps3psumanager.elf ps3psumanager.self ps3psumanager.pkg PS3-PSU-Manager-experimental-source.zip > SHA256SUMS.txt)
+      - name: Publish experimental prerelease only after successful build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          TAG="psu-verified-experimental-${GITHUB_RUN_NUMBER}-${GITHUB_RUN_ATTEMPT}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Refusing to overwrite existing release $TAG" >&2
+            exit 1
+          fi
+          gh release create "$TAG" dist/* --target "$GITHUB_SHA" --title "PS3 PSU Manager Experimental Verified Toolchain $TAG" --notes "Built with the hardware-validated Tiny3D toolchain. Full application has NOT yet been validated on real PS3. Stable v1.64 unchanged." --prerelease
