@@ -2658,6 +2658,91 @@ static void update_fps_counter(){
 static volatile u32 g_6v_long_flip_count=0;
 static volatile u32 g_6v_max_flip_us=0;
 static volatile u32 g_6v_last_get=0,g_6v_last_put=0;
+
+/* Stage 6V 30s dual capture: frame sampling is RAM-only; save after window. */
+#define V6_MAX 4096
+typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;} v6_row;
+static v6_row v6_rows[V6_MAX];
+static unsigned v6_n=0,v6_active=0,v6_pending=0,v6_done=0,v6_overflow=0;
+static unsigned long long v6_begin=0,v6_prev=0;
+static char v6_icon[256]="";
+static int v6_scene(){
+ if(g_options_active||g_psu_metadata_active||g_catalogue_active||
+    g_download_progress_active||g_rename_active||g_delete_confirm_active||
+    g_zip_confirm_active||g_apollo_warning_active)return 0;
+ if(!archive_mode)return 1;
+ if(item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&
+    preview_entry_is_standard_icn(items[selected].name)&&g_preview.valid)return 2;
+ return 0;
+}
+static void v6_capture(unsigned long long now,unsigned long long before,unsigned vb,unsigned status){
+ int scene=v6_scene();
+ if(v6_active&&(scene!=(int)v6_active||
+   (v6_active==2&&strcmp(v6_icon,items[selected].name)))){
+   v6_active=0;v6_n=0;v6_overflow=0;
+ }
+ if(!v6_active&&!v6_pending&&scene&&!(v6_done&(1u<<scene))){
+  v6_active=scene;v6_begin=v6_prev=now;v6_n=0;v6_overflow=0;
+  if(scene==2)snprintf(v6_icon,sizeof(v6_icon),"%s",items[selected].name);
+ }
+ if(!v6_active)return;
+ gcmControlRegister *cr=gcmGetControlRegister();
+ if(v6_n<V6_MAX){
+  v6_row *p=&v6_rows[v6_n++];
+  p->frame=g_frame_counter;p->dt=(u32)(now-v6_prev);
+  p->draw=(u32)(before>=g_perf_draw_begin_us?before-g_perf_draw_begin_us:0);
+  p->flip=(u32)(now-before);p->get=cr?cr->get:0;p->put=cr?cr->put:0;
+  p->vb=vb;p->status=status;
+ }else ++v6_overflow;
+ v6_prev=now;
+ if(now-v6_begin>=30000000ULL){
+  v6_pending=v6_active;v6_done|=1u<<v6_active;v6_active=0;
+ }
+}
+static void v6_save(){
+ if(!v6_pending)return;
+ unsigned scene=v6_pending;v6_pending=0;
+ const char *base=scene==1?"main_menu":"icn_preview";
+ const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
+ char csv[256],txt[256];mkdir(dir,0777);
+ snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
+ snprintf(txt,sizeof(txt),"%s/%s_summary.txt",dir,base);
+ int csv_ok=0,txt_ok=0;
+ unsigned long long total_dt=0,total_draw=0,total_flip=0;
+ unsigned max_dt=0,max_flip=0,stalls=0;
+ FILE *f=fopen(csv,"wb");
+ if(f){
+  fprintf(f,"frame,interval_us,draw_us,flip_us,rsx_get,rsx_put,vblank_delta,flip_status\n");
+  for(unsigned i=0;i<v6_n;i++){
+   const v6_row *p=&v6_rows[i];
+   if(i){total_dt+=p->dt;if(p->dt>max_dt)max_dt=p->dt;}
+   total_draw+=p->draw;total_flip+=p->flip;
+   if(p->flip>max_flip)max_flip=p->flip;
+   if(p->flip>100000)++stalls;
+   fprintf(f,"%u,%u,%u,%u,%08X,%08X,%u,%u\n",p->frame,p->dt,p->draw,
+           p->flip,p->get,p->put,p->vb,p->status);
+  }
+  csv_ok=!ferror(f);if(fclose(f)!=0)csv_ok=0;
+ }
+ f=fopen(txt,"wb");
+ if(f){
+  fprintf(f,"Stage 6V %s - 30 seconds\n",base);
+  if(scene==2)fprintf(f,"Icon: %s\n",v6_icon);
+  fprintf(f,"Samples: %u\nOverflow: %u\n",v6_n,v6_overflow);
+  fprintf(f,"Mean FPS: %.3f\n",total_dt&&v6_n>1?1000000.0*(v6_n-1)/total_dt:0.0);
+  fprintf(f,"Mean draw ms: %.3f\nMean flip ms: %.3f\n",
+          v6_n?total_draw/1000.0/v6_n:0.0,v6_n?total_flip/1000.0/v6_n:0.0);
+  fprintf(f,"Max frame ms: %.3f\nMax flip ms: %.3f\nStalls >100ms: %u\n",
+          max_dt/1000.0,max_flip/1000.0,stalls);
+  fprintf(f,"CSV written: %s\n",csv_ok?"yes":"no");
+  txt_ok=!ferror(f);if(fclose(f)!=0)txt_ok=0;
+ }
+ snprintf(status_line,sizeof(status_line),
+    csv_ok&&txt_ok?"Stage 6V %s: 30s logs SAVED - press X to continue":
+                   "Stage 6V %s: LOG SAVE FAILED - check HDD",base);
+ g_ui_dirty=1;
+}
+
 static void present(){
  rsx_flush_text_batch();
  rsx_flush_rect_batch();
@@ -2678,6 +2763,7 @@ static void present(){
  tiny3d_Flip();
  g_4x_probe_active=0;
  unsigned long long after_flip=fps_now_us();
+ v6_capture(after_flip,before_flip,(unsigned)(g_vblank_count-vb_before),(unsigned)g_perf_flip_status_before);
  /* Capture only after the normal Tiny3D flip has returned. These counters
     are observational; do not attempt GPU recovery from the render thread. */
  {
@@ -6043,6 +6129,7 @@ static void game_db_auto_check(void){
 
 int main(){if(video_init()!=0)return 1;sysThreadCreate(&g_5g_thread,phase5g_sampler,NULL,1500,0x4000,0,(char*)"psu_5g_fifo");ioPadInit(7);atexit(shutdown_video);sysUtilRegisterCallback(0,sysutil_cb,NULL);load_settings();catalogue_load_cache();set_device_default_path("/dev_hdd0");refresh_fs();game_db_auto_check();g_last_user_activity_us=fps_now_us();enum{B_UP=1<<0,B_DOWN=1<<1,B_CROSS=1<<2,B_CIRCLE=1<<3,B_SQUARE=1<<4,B_TRIANGLE=1<<5,B_SELECT=1<<6,B_START=1<<7,B_L1=1<<8,B_R1=1<<9,B_LEFT=1<<10,B_RIGHT=1<<11,B_L2=1<<12,B_R2=1<<13,B_R3=1<<14,B_L3=1<<15};padInfo pi;padData pd;u16 prev=0;while(running){
  sysUtilCheckCallback();
+ v6_save();
  /* v1.49 clean-renderer recovery: do not touch video configuration, framebuffer
     snapshots, cache ownership, or DRAW_BEGIN/DRAW_END.  Request one ordinary
     complete application redraw after MENU_CLOSE.  g_ui_dirty blocks the
