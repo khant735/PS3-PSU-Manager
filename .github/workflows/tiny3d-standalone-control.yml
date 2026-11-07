@@ -1,15 +1,6 @@
 name: PS3 PSU Manager — Verified Tiny3D Toolchain Control
 on:
   workflow_dispatch:
-    inputs:
-      sdk_archive_url:
-        description: 'HTTPS URL to exact ps3dev_psl1ght_full_toolchain.tar.zst (155 MB)'
-        required: true
-        type: string
-      compiler_archive_url:
-        description: 'HTTPS URL to exact ps3dev_ppu_compiler_cgcomp.tar.zst (85 MB)'
-        required: true
-        type: string
 permissions:
   contents: write
 jobs:
