@@ -26,11 +26,11 @@ jobs:
       - name: Install archive and runtime dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq zstd curl ca-certificates libgmp10 libmpfr6 libmpc3 libelf1
+          sudo apt-get install -y -qq zstd curl ca-certificates libgmp10 libmpfr6 libmpc3 libelf-dev
       - name: Download and verify known-working archives
         env:
-          SDK_URL: ${{ inputs.sdk_archive_url }}
-          COMPILER_URL: ${{ inputs.compiler_archive_url }}
+          SDK_URL: https://github.com/khant735/PS3-PSU-Manager/releases/download/ps3dev-verified-toolchain/ps3dev_psl1ght_full_toolchain.tar.zst
+          COMPILER_URL: https://github.com/khant735/PS3-PSU-Manager/releases/download/ps3dev-verified-toolchain/ps3dev_ppu_compiler_cgcomp.tar.zst
         run: |
           set -euo pipefail
           mkdir -p dist
