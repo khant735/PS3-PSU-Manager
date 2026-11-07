@@ -1,6 +1,7 @@
 name: PS3 PSU Manager — Verified Tiny3D Toolchain Control
 on:
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: write
 jobs:
