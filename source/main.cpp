@@ -2676,7 +2676,7 @@ static char v6_icon[256]="";
 static u32 v6_pre_get=0,v6_pre_put=0,v6_post_get=0,v6_post_put=0,v6_buffer_before=0,v6_buffer_after=0;
 static int v6_scene(){
  /* Phase 10 only: preserve legacy captures on disk, do not rerun them. */
- for(int phase=18;phase<=23;phase++)
+ for(int phase=24;phase<=29;phase++)
   if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
  return 0;
 }
@@ -2715,7 +2715,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":"p10_reference";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":scene==23?"p10_reference":scene==24?"p11_no_texture":scene==25?"p11_init_only":scene==26?"p11_bind_only":scene==27?"p11_quad_only":scene==28?"p11_browser_textured":"p11_reference";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -3727,7 +3727,7 @@ static void draw(){
     Scene ends only after v6_capture has marked its 30-second window done. */
  if(!v6_static_started){v6_static_started=1;v6_static_start_us=g_perf_draw_begin_us;}
  /* Completion prompt appears only after the last CSV and summary are saved. */
- const unsigned v6_required_mask=((1u<<24)-1u)&~((1u<<18)-1u);
+ const unsigned v6_required_mask=((1u<<30)-1u)&~((1u<<24)-1u);
  if((v6_done&v6_required_mask)==v6_required_mask && !v6_pending){
   g_v6_hide_text=0;
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
@@ -3770,6 +3770,7 @@ static void draw(){
  if(v6_done&(1u<<9))for(int phase=10;phase<=15;phase++)
   if(!(v6_done&(1u<<phase))){p8_scene=phase;break;}
  if(v6_done&(1u<<22) && !(v6_done&(1u<<23)))p8_scene=23;
+ if(v6_done&(1u<<28) && !(v6_done&(1u<<29)))p8_scene=29;
  if(p8_scene){
   g_v6_hide_text=0;
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
@@ -3799,21 +3800,23 @@ static void draw(){
     text(px+6,py+9,"RSX TEXT 0123",0xFFFFFFFFu,1);
    }
   }
-  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":p8_scene==23?"PHASE 10 F - REFERENCE":"PHASE 9 A - REFERENCE COMBINED";
+  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":p8_scene==23?"PHASE 10 F - REFERENCE":p8_scene==29?"PHASE 11 F - REFERENCE":"PHASE 9 A - REFERENCE COMBINED";
   rsx_ui_rect(0,0,(int)g_width,64,0xFF122C48u);
   rsx_ui_text_raw(20,16,label,0xFFFFFFFFu,2);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;
   present();g_frame_counter++;return;
  }
+ int p11_browser=0;
+ for(int phase=24;phase<=28;phase++)if(!(v6_done&(1u<<phase))){p11_browser=phase;break;}
  int p10_browser=0;
- for(int phase=18;phase<=22;phase++)if(!(v6_done&(1u<<phase))){p10_browser=phase;break;}
+ if(!p11_browser && !(v6_done&(1u<<29)))for(int phase=18;phase<=22;phase++)if(!(v6_done&(1u<<phase))){p10_browser=phase;break;}
  int p9_browser=0;
  if(v6_done&(1u<<15) && !p10_browser)for(int phase=16;phase<=17;phase++)if(!(v6_done&(1u<<phase))){p9_browser=phase;break;}
  int v6_layer=0;
  if(v6_done&(1u<<5))for(int phase=6;phase<=9;phase++)if(!(v6_done&(1u<<phase))){v6_layer=phase;break;}
  g_v6_hide_text=(v6_layer==6||v6_layer==7);
- if(v6_layer||p9_browser||p10_browser)g_ui_dirty=1;
+ if(v6_layer||p9_browser||p10_browser||p11_browser)g_ui_dirty=1;
  if(!(v6_done&(1u<<5)))g_ui_dirty=1;
  /* Details owns a complete deterministic RSX frame.  Do this before every
     legacy archive fast path so no software framebuffer renderer participates
@@ -3868,7 +3871,22 @@ static void draw(){
  g_5c_off[0]=phase5c_cmd_off(); g_5c_stage=0;
  unsigned long long perf_t0=fps_now_us(),perf_t1=0;
  g_perf_text_flushes=0; g_perf_rect_flushes=0; g_perf_line_submits=0;
- if(p10_browser==18){
+ if(p11_browser==24){
+  /* Browser with no background texture and no background draw. */
+ }else if(p11_browser==25){
+  rsx_bg_init(); /* CPU texture allocation and conversion only. */
+ }else if(p11_browser==26){
+  rsx_bg_init();
+  if(g_rsx_bg_ready)
+   tiny3d_SetTextureWrap(0,g_rsx_bg_off,PS2_BG_W,PS2_BG_H,
+    PS2_BG_W*4,TINY3D_TEX_FORMAT_A8R8G8B8,
+    TEXTWRAP_CLAMP,TEXTWRAP_CLAMP,TEXTURE_LINEAR);
+  /* Bind texture without submitting background geometry. */
+ }else if(p11_browser==27){
+  rsx_draw_background(); /* Textured quad, then browser UI. */
+ }else if(p11_browser==28){
+  rsx_draw_background(); /* Full normal browser textured baseline. */
+ }else if(p10_browser==18){
   rsx_ui_rect(0,0,(int)g_width,(int)g_height,0xFF243E58u);
  }else if(p10_browser==19){
   rsx_bg_init(); /* Allocate and initialize background; do not bind/draw it. */
