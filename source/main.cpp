@@ -2678,7 +2678,7 @@ static int v6_scene(){
  if(v6_static_started && !(v6_done&(1u<<3)))return 3;
  if(v6_static_started && !(v6_done&(1u<<4)))return 4;
  if(v6_static_started && !(v6_done&(1u<<5)))return 5;
- for(int phase=6;phase<=14;phase++)if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
+ for(int phase=6;phase<=17;phase++)if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
  if(g_options_active||g_psu_metadata_active||g_catalogue_active||
     g_download_progress_active||g_rename_active||g_delete_confirm_active||
     g_zip_confirm_active||g_apollo_warning_active)return 0;
@@ -2722,7 +2722,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":"p8_combined";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":"p9_browser_normal";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -3745,7 +3745,7 @@ static void draw(){
  /* Phase 8: deterministic, independent 30s A/B render workloads.
     No browser caches, file rows, or ICN renderer are involved. */
  int p8_scene=0;
- if(v6_done&(1u<<9))for(int phase=10;phase<=14;phase++)
+ if(v6_done&(1u<<9))for(int phase=10;phase<=15;phase++)
   if(!(v6_done&(1u<<phase))){p8_scene=phase;break;}
  if(p8_scene){
   g_v6_hide_text=0;
@@ -3776,17 +3776,19 @@ static void draw(){
     text(px+6,py+9,"RSX TEXT 0123",0xFFFFFFFFu,1);
    }
   }
-  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":"PHASE 8 E - COMBINED";
+  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":"PHASE 9 A - REFERENCE COMBINED";
   rsx_ui_rect(0,0,(int)g_width,64,0xFF122C48u);
   rsx_ui_text_raw(20,16,label,0xFFFFFFFFu,2);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;
   present();g_frame_counter++;return;
  }
+ int p9_browser=0;
+ if(v6_done&(1u<<15))for(int phase=16;phase<=17;phase++)if(!(v6_done&(1u<<phase))){p9_browser=phase;break;}
  int v6_layer=0;
  if(v6_done&(1u<<5))for(int phase=6;phase<=9;phase++)if(!(v6_done&(1u<<phase))){v6_layer=phase;break;}
  g_v6_hide_text=(v6_layer==6||v6_layer==7);
- if(v6_layer)g_ui_dirty=1;
+ if(v6_layer||p9_browser)g_ui_dirty=1;
  if(!(v6_done&(1u<<5)))g_ui_dirty=1;
  /* Details owns a complete deterministic RSX frame.  Do this before every
     legacy archive fast path so no software framebuffer renderer participates
@@ -3841,7 +3843,7 @@ static void draw(){
  g_5c_off[0]=phase5c_cmd_off(); g_5c_stage=0;
  unsigned long long perf_t0=fps_now_us(),perf_t1=0;
  g_perf_text_flushes=0; g_perf_rect_flushes=0; g_perf_line_submits=0;
- rsx_draw_background();
+ if(p9_browser!=16)rsx_draw_background();
  perf_t1=fps_now_us(); perf_avg(&g_perf_bg_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[1]=phase5c_cmd_off(); g_5c_stage=1;
  g_rsx_ui_overlay=1;
  const char *title="PS2 PSU Manager v1.64";
