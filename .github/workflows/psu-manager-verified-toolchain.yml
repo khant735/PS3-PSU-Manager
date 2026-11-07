@@ -1,0 +1,11 @@
+name: PS3 PSU Manager — Experimental Verified Toolchain Build
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    if: github.ref == 'refs/heads/research-tiny3d-crossproject-audit'
+    uses: khant735/PS3-PSU-Manager/.github/workflows/psu-manager-verified-toolchain.yml@research-tiny3d-crossproject-audit
+    permissions:
+      contents: write
