@@ -13,8 +13,15 @@ jobs:
       PSL1GHT: /usr/local/ps3dev
       EXPECTED_ELF_SHA256: 8df1a0a87a40157b4a6e40dab36b4e70d6224e075b8e4d77c4f761d128be0f18
     steps:
-      - name: Checkout exact branch revision
-        uses: actions/checkout@v4
+      - name: Checkout exact branch revision (no third-party Actions)
+        run: |
+          set -euo pipefail
+          git init -q .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git -c protocol.version=2 fetch --no-tags --depth=1 origin "${GITHUB_SHA}"
+          git checkout -q --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          echo "Checked out verified commit $(git rev-parse HEAD)"
       - name: Install archive and runtime dependencies
         run: |
           sudo apt-get update -qq
