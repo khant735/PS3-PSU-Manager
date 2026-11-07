@@ -2672,12 +2672,12 @@ static void psu_ft_record(unsigned long long end_us,float draw_ms,float flip_ms,
  if(g_ft_count!=PSU_FT_SAMPLES)return;
  FILE *csv=fopen("/dev_hdd0/tmp/ps3psu_frame_timing.csv","wb");
  FILE *summary=fopen("/dev_hdd0/tmp/ps3psu_frame_summary.txt","wb");
- if(csv)fprintf(csv,"frame,end_us,draw_ms,flip_ms,frame_ms,vblanks,vblank_total,buffer_before,buffer_after,flip_status_before\\n");
+ if(csv)fprintf(csv,"frame,end_us,draw_ms,flip_ms,frame_ms,vblanks,vblank_total,buffer_before,buffer_after,flip_status_before\n");
  double draw_sum=0,flip_sum=0,frame_sum=0,draw_max=0,flip_max=0,frame_max=0;
  unsigned int late=0,missed=0,buffer_same=0,valid_frames=0;
  for(unsigned int i=0;i<g_ft_count;i++){
   const psu_ft_sample_t *q=&g_ft_samples[i];
-  if(csv)fprintf(csv,"%u,%llu,%.3f,%.3f,%.3f,%u,%u,%d,%d,%d\\n",
+  if(csv)fprintf(csv,"%u,%llu,%.3f,%.3f,%.3f,%u,%u,%d,%d,%d\n",
      i+1,q->end_us,q->draw_ms,q->flip_ms,q->frame_ms,q->vb_delta,
      q->vb_total,q->back_before,q->back_after,q->flip_status);
   draw_sum+=q->draw_ms;flip_sum+=q->flip_ms;
@@ -2692,16 +2692,16 @@ static void psu_ft_record(unsigned long long end_us,float draw_ms,float flip_ms,
  }
  if(csv)fclose(csv);
  if(summary){
-  fprintf(summary,"PS3 PSU Manager FT1 - 600 presented frames (startup capture)\\n");
-  fprintf(summary,"Average draw: %.3f ms; maximum: %.3f ms\\n",draw_sum/g_ft_count,draw_max);
-  fprintf(summary,"Average flip: %.3f ms; maximum: %.3f ms\\n",flip_sum/g_ft_count,flip_max);
-  fprintf(summary,"Average frame: %.3f ms; maximum: %.3f ms\\n",valid_frames?frame_sum/valid_frames:0.0,frame_max);
-  fprintf(summary,"Frames >17.5 ms: %u; frames >33.5 ms: %u\\n",late,missed);
+  fprintf(summary,"PS3 PSU Manager FT1 - 600 presented frames (startup capture)\n");
+  fprintf(summary,"Average draw: %.3f ms; maximum: %.3f ms\n",draw_sum/g_ft_count,draw_max);
+  fprintf(summary,"Average flip: %.3f ms; maximum: %.3f ms\n",flip_sum/g_ft_count,flip_max);
+  fprintf(summary,"Average frame: %.3f ms; maximum: %.3f ms\n",valid_frames?frame_sum/valid_frames:0.0,frame_max);
+  fprintf(summary,"Frames >17.5 ms: %u; frames >33.5 ms: %u\n",late,missed);
   fprintf(summary,"VBlank deltas >1: ");
   unsigned int vb_multi=0;
   for(unsigned int i=0;i<g_ft_count;i++)if(g_ft_samples[i].vb_delta>1)vb_multi++;
-  fprintf(summary,"%u; unchanged buffer index: %u\\n",vb_multi,buffer_same);
-  fprintf(summary,"Measurements are CPU-side timing/counters, not proof of GPU completion or scanout ownership.\\n");
+  fprintf(summary,"%u; unchanged buffer index: %u\n",vb_multi,buffer_same);
+  fprintf(summary,"Measurements are CPU-side timing/counters, not proof of GPU completion or scanout ownership.\n");
   fclose(summary);
  }
 }
