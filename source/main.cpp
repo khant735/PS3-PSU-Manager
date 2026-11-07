@@ -2007,7 +2007,7 @@ static void draw_texture_scaled(int x,int y,int w,int h,const u32 *tex){
    }
    if(!g_browser_thumb_rsx[i])return;
    if(!g_browser_thumb_gpu_ready[i] || g_browser_thumb_uploaded_pixels[i]!=tex){
-    memcpy(g_browser_thumb_rsx[i],tex,128u*128u*4u);
+    memcpy(g_browser_thumb_rsx[i],tex,128u*128u*4u);v6_note_upload(128u*128u*4u);
     g_browser_thumb_uploaded_pixels[i]=tex;
     g_browser_thumb_gpu_ready[i]=1;
    }
@@ -2018,7 +2018,7 @@ static void draw_texture_scaled(int x,int y,int w,int h,const u32 *tex){
  if(!tex||w<=0||h<=0)return;
  if(g_rsx_ui_overlay){
   rsx_preview_tex_init();if(!g_rsx_preview_tex_ready)return;
-  memcpy(g_rsx_icn_tex,tex,128u*128u*4u);
+  memcpy(g_rsx_icn_tex,tex,128u*128u*4u);v6_note_upload(128u*128u*4u);
   rsx_draw_uploaded_quad(g_rsx_icn_off,128,128,128*4,x,y,w,h,1.0f,1.0f,1);
   return;
  }
@@ -2180,7 +2180,7 @@ static void blit_model_cache(int box_x,int box_y,int box_w,int box_h){
  if(g_rsx_ui_overlay){
   rsx_preview_tex_init();if(!g_rsx_preview_tex_ready)return;
   int sw=g_model_cache_w,sh=g_model_cache_h;if(sw>RSX_MODEL_TEX_W)sw=RSX_MODEL_TEX_W;if(sh>RSX_MODEL_TEX_H)sh=RSX_MODEL_TEX_H;
-  memset(g_rsx_model_tex,0,RSX_MODEL_TEX_W*RSX_MODEL_TEX_H*4u);
+  memset(g_rsx_model_tex,0,RSX_MODEL_TEX_W*RSX_MODEL_TEX_H*4u);v6_note_upload(RSX_MODEL_TEX_W*RSX_MODEL_TEX_H*4u);
   for(int yy=0;yy<sh;yy++)memcpy(g_rsx_model_tex+(size_t)yy*RSX_MODEL_TEX_W,g_model_cache+(size_t)yy*g_model_cache_w,(size_t)sw*4u);
   rsx_draw_uploaded_quad(g_rsx_model_off,RSX_MODEL_TEX_W,RSX_MODEL_TEX_H,RSX_MODEL_TEX_W*4,box_x,box_y,box_w,box_h,(float)sw/RSX_MODEL_TEX_W,(float)sh/RSX_MODEL_TEX_H,1);
   return;
@@ -2659,15 +2659,21 @@ static volatile u32 g_6v_long_flip_count=0;
 static volatile u32 g_6v_max_flip_us=0;
 static volatile u32 g_6v_last_get=0,g_6v_last_put=0;
 
+/* Stage 6V Phase 5: RAM-only upload telemetry and one-time 30s static scene. */
+static u32 v6_uploads=0,v6_upload_bytes=0;
+static int v6_static_started=0;
+static unsigned long long v6_static_start_us=0;
+static void v6_note_upload(u32 bytes){++v6_uploads;v6_upload_bytes+=bytes;}
 /* Stage 6V 30s dual capture: frame sampling is RAM-only; save after window. */
 #define V6_MAX 4096
-typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;} v6_row;
+typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;} v6_row;
 static v6_row v6_rows[V6_MAX];
 static unsigned v6_n=0,v6_active=0,v6_pending=0,v6_done=0,v6_overflow=0;
 static unsigned long long v6_begin=0,v6_prev=0;
 static char v6_icon[256]="";
 static u32 v6_pre_get=0,v6_pre_put=0,v6_post_get=0,v6_post_put=0,v6_buffer_before=0,v6_buffer_after=0;
 static int v6_scene(){
+ if(v6_static_started && !(v6_done&(1u<<3)))return 3;
  if(g_options_active||g_psu_metadata_active||g_catalogue_active||
     g_download_progress_active||g_rename_active||g_delete_confirm_active||
     g_zip_confirm_active||g_apollo_warning_active)return 0;
@@ -2701,7 +2707,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
   p->tail_us=(g_4x_waitcmd_end_us&&now>=g_4x_waitcmd_end_us)?(u32)(now-g_4x_waitcmd_end_us):0;
   p->polls=g_4x_status_polls;p->callbacks=g_5b_cb_count;
   p->buffer_before=v6_buffer_before;p->buffer_after=v6_buffer_after;
-  p->draw_bg_us=(u32)(g_perf_bg_ms*1000.0f);p->draw_list_us=(u32)(g_perf_list_ms*1000.0f);p->draw_preview_us=(u32)(g_perf_preview_ms*1000.0f);
+  p->draw_bg_us=(u32)(g_perf_bg_ms*1000.0f);p->draw_list_us=(u32)(g_perf_list_ms*1000.0f);p->draw_preview_us=(u32)(g_perf_preview_ms*1000.0f);p->uploads=v6_uploads;p->upload_bytes=v6_upload_bytes;
  }else ++v6_overflow;
  v6_prev=now;
  if(now-v6_begin>=30000000ULL){
@@ -2711,7 +2717,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":"icn_preview";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":"static_scene";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -2721,17 +2727,17 @@ static void v6_save(){
  unsigned max_dt=0,max_flip=0,stalls=0;
  FILE *f=fopen(csv,"wb");
  if(f){
-  fprintf(f,"frame,interval_us,draw_us,flip_us,rsx_get,rsx_put,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after,avg_bg_us,avg_list_us,avg_preview_us\n");
+  fprintf(f,"frame,interval_us,draw_us,flip_us,rsx_get,rsx_put,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after,avg_bg_us,avg_list_us,avg_preview_us,texture_uploads,texture_upload_bytes\n");
   for(unsigned i=0;i<v6_n;i++){
    const v6_row *p=&v6_rows[i];
    if(i){total_dt+=p->dt;if(p->dt>max_dt)max_dt=p->dt;}
    total_draw+=p->draw;total_flip+=p->flip;
    if(p->flip>max_flip)max_flip=p->flip;
    if(p->flip>100000)++stalls;
-   fprintf(f,"%u,%u,%u,%u,%08X,%08X,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",p->frame,p->dt,p->draw,
+   fprintf(f,"%u,%u,%u,%u,%08X,%08X,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",p->frame,p->dt,p->draw,
            p->flip,p->get,p->put,p->vb,p->status,p->pre_get,p->pre_put,p->post_get,p->post_put,
            p->poll_us,p->queue_us,p->waitcmd_us,p->tail_us,p->polls,p->callbacks,
-           p->buffer_before,p->buffer_after,p->draw_bg_us,p->draw_list_us,p->draw_preview_us);
+           p->buffer_before,p->buffer_after,p->draw_bg_us,p->draw_list_us,p->draw_preview_us,p->uploads,p->upload_bytes);
   }
   csv_ok=!ferror(f);if(fclose(f)!=0)csv_ok=0;
  }
@@ -3704,6 +3710,19 @@ static int draw_psu_metadata_rsx_frame(){
 static void draw_downloader_progress();
 static void draw(){
  g_perf_draw_begin_us=fps_now_us();
+ v6_uploads=0;v6_upload_bytes=0;
+ /* First diagnostic window: static background through normal Tiny3D flip.
+    Scene ends only after v6_capture has marked its 30-second window done. */
+ if(!v6_static_started){v6_static_started=1;v6_static_start_us=g_perf_draw_begin_us;}
+ if(!(v6_done&(1u<<3))){
+  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+  tiny3d_Project2D();
+  g_rsx_ui_overlay=1;
+  rsx_draw_background();
+  g_rsx_ui_overlay=0;
+  present();g_frame_counter++;
+  return;
+ }
  /* Details owns a complete deterministic RSX frame.  Do this before every
     legacy archive fast path so no software framebuffer renderer participates
     while the metadata modal is visible. */
