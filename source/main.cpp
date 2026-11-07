@@ -2678,7 +2678,7 @@ static int v6_scene(){
  if(v6_static_started && !(v6_done&(1u<<3)))return 3;
  if(v6_static_started && !(v6_done&(1u<<4)))return 4;
  if(v6_static_started && !(v6_done&(1u<<5)))return 5;
- for(int phase=6;phase<=9;phase++)if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
+ for(int phase=6;phase<=14;phase++)if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
  if(g_options_active||g_psu_metadata_active||g_catalogue_active||
     g_download_progress_active||g_rename_active||g_delete_confirm_active||
     g_zip_confirm_active||g_apollo_warning_active)return 0;
@@ -2722,7 +2722,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":"complete_ui";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":"p8_combined";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -3741,6 +3741,47 @@ static void draw(){
   rsx_ui_text_raw(20,16,"PHASE 6 - CHECKERBOARD - 30 SECONDS",0xFFFFFFFFu,2);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;present();g_frame_counter++;return;
+ }
+ /* Phase 8: deterministic, independent 30s A/B render workloads.
+    No browser caches, file rows, or ICN renderer are involved. */
+ int p8_scene=0;
+ if(v6_done&(1u<<9))for(int phase=10;phase<=14;phase++)
+  if(!(v6_done&(1u<<phase))){p8_scene=phase;break;}
+ if(p8_scene){
+  g_v6_hide_text=0;
+  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+  tiny3d_AlphaTest(1,0x10,TINY3D_ALPHA_FUNC_GEQUAL);
+  tiny3d_BlendFunc(1,
+   (blend_src_func)(TINY3D_BLEND_FUNC_SRC_RGB_SRC_ALPHA | TINY3D_BLEND_FUNC_SRC_ALPHA_SRC_ALPHA),
+   (blend_dst_func)(TINY3D_BLEND_FUNC_SRC_ALPHA_ONE_MINUS_SRC_ALPHA | TINY3D_BLEND_FUNC_SRC_RGB_ONE_MINUS_SRC_ALPHA),
+   (blend_func)(TINY3D_BLEND_RGB_FUNC_ADD | TINY3D_BLEND_ALPHA_FUNC_ADD));
+  tiny3d_Project2D();
+  g_rsx_ui_overlay=1;
+  rsx_draw_background();
+  const int nx=8,ny=5;
+  for(int y=0;y<ny;y++)for(int x=0;x<nx;x++){
+   int px=40+x*((int)g_width-80)/nx;
+   int py=90+y*((int)g_height-130)/ny;
+   int w=((int)g_width-80)/nx-8,h=((int)g_height-130)/ny-8;
+   u32 c=((x+y)&1)?0xCC31628Cu:0xCC16354Fu;
+   if(p8_scene==10)rsx_ui_rect(px,py,w,h,c);
+   else if(p8_scene==11)round_rect(px,py,w,h,8,c);
+   else if(p8_scene==12)gradient_rect_v(px,py,w,h,0xCC397EA7u,0xCC0C2037u);
+   else if(p8_scene==13){
+    rsx_ui_rect(px,py,w,h,0xAA1A3045u);
+    text(px+5,py+8,"RSX TEXT 0123",0xFFFFFFFFu,1);
+   }else{
+    round_rect(px,py,w,h,8,c);
+    gradient_rect_v(px+4,py+4,w-8,h-8,0xAA397EA7u,0xAA0C2037u);
+    text(px+6,py+9,"RSX TEXT 0123",0xFFFFFFFFu,1);
+   }
+  }
+  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":"PHASE 8 E - COMBINED";
+  rsx_ui_rect(0,0,(int)g_width,64,0xFF122C48u);
+  rsx_ui_text_raw(20,16,label,0xFFFFFFFFu,2);
+  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
+  g_rsx_ui_overlay=0;
+  present();g_frame_counter++;return;
  }
  int v6_layer=0;
  if(v6_done&(1u<<5))for(int phase=6;phase<=9;phase++)if(!(v6_done&(1u<<phase))){v6_layer=phase;break;}
