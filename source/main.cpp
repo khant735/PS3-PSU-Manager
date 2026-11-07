@@ -2675,16 +2675,9 @@ static unsigned long long v6_begin=0,v6_prev=0;
 static char v6_icon[256]="";
 static u32 v6_pre_get=0,v6_pre_put=0,v6_post_get=0,v6_post_put=0,v6_buffer_before=0,v6_buffer_after=0;
 static int v6_scene(){
- if(v6_static_started && !(v6_done&(1u<<3)))return 3;
- if(v6_static_started && !(v6_done&(1u<<4)))return 4;
- if(v6_static_started && !(v6_done&(1u<<5)))return 5;
- for(int phase=6;phase<=17;phase++)if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
- if(g_options_active||g_psu_metadata_active||g_catalogue_active||
-    g_download_progress_active||g_rename_active||g_delete_confirm_active||
-    g_zip_confirm_active||g_apollo_warning_active)return 0;
- if(!archive_mode)return 1;
- if(item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&
-    preview_entry_is_standard_icn(items[selected].name)&&g_preview.valid)return 2;
+ /* Phase 10 only: preserve legacy captures on disk, do not rerun them. */
+ for(int phase=18;phase<=23;phase++)
+  if(v6_static_started&&!(v6_done&(1u<<phase)))return phase;
  return 0;
 }
 static void v6_capture(unsigned long long now,unsigned long long before,unsigned vb,unsigned status){
@@ -2722,7 +2715,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":"p9_browser_normal";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":"p10_reference";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -2756,6 +2749,20 @@ static void v6_save(){
           v6_n?total_draw/1000.0/v6_n:0.0,v6_n?total_flip/1000.0/v6_n:0.0);
   fprintf(f,"Max frame ms: %.3f\nMax flip ms: %.3f\nStalls >100ms: %u\n",
           max_dt/1000.0,max_flip/1000.0,stalls);
+  /* Separate first-five-second statistics to expose transition-only stalls. */
+  unsigned long long startup_us=0,start_draw=0,start_flip=0;
+  unsigned startup_frames=0,start_stalls=0;
+  for(unsigned i=0;i<v6_n;i++){
+   const v6_row *p=&v6_rows[i];
+   if(i && startup_us+p->dt>5000000ULL)break;
+   if(i)startup_us+=p->dt;
+   start_draw+=p->draw;start_flip+=p->flip;startup_frames++;
+   if(p->flip>100000)start_stalls++;
+  }
+  fprintf(f,"First 5s samples: %u\nFirst 5s mean FPS: %.3f\nFirst 5s mean draw ms: %.3f\nFirst 5s mean flip ms: %.3f\nFirst 5s stalls >100ms: %u\n",
+   startup_frames,startup_us&&startup_frames>1?1000000.0*(startup_frames-1)/startup_us:0.0,
+   startup_frames?start_draw/1000.0/startup_frames:0.0,
+   startup_frames?start_flip/1000.0/startup_frames:0.0,start_stalls);
   fprintf(f,"CSV written: %s\n",csv_ok?"yes":"no");
   txt_ok=!ferror(f);if(fclose(f)!=0)txt_ok=0;
  }
@@ -3720,7 +3727,7 @@ static void draw(){
     Scene ends only after v6_capture has marked its 30-second window done. */
  if(!v6_static_started){v6_static_started=1;v6_static_start_us=g_perf_draw_begin_us;}
  /* Completion prompt appears only after the last CSV and summary are saved. */
- const unsigned v6_required_mask=((1u<<18)-1u)&~((1u<<3)-1u);
+ const unsigned v6_required_mask=((1u<<24)-1u)&~((1u<<18)-1u);
  if((v6_done&v6_required_mask)==v6_required_mask && !v6_pending){
   g_v6_hide_text=0;
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
@@ -3762,6 +3769,7 @@ static void draw(){
  int p8_scene=0;
  if(v6_done&(1u<<9))for(int phase=10;phase<=15;phase++)
   if(!(v6_done&(1u<<phase))){p8_scene=phase;break;}
+ if(v6_done&(1u<<22) && !(v6_done&(1u<<23)))p8_scene=23;
  if(p8_scene){
   g_v6_hide_text=0;
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
@@ -3791,19 +3799,21 @@ static void draw(){
     text(px+6,py+9,"RSX TEXT 0123",0xFFFFFFFFu,1);
    }
   }
-  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":"PHASE 9 A - REFERENCE COMBINED";
+  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":p8_scene==23?"PHASE 10 F - REFERENCE":"PHASE 9 A - REFERENCE COMBINED";
   rsx_ui_rect(0,0,(int)g_width,64,0xFF122C48u);
   rsx_ui_text_raw(20,16,label,0xFFFFFFFFu,2);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;
   present();g_frame_counter++;return;
  }
+ int p10_browser=0;
+ for(int phase=18;phase<=22;phase++)if(!(v6_done&(1u<<phase))){p10_browser=phase;break;}
  int p9_browser=0;
- if(v6_done&(1u<<15))for(int phase=16;phase<=17;phase++)if(!(v6_done&(1u<<phase))){p9_browser=phase;break;}
+ if(v6_done&(1u<<15) && !p10_browser)for(int phase=16;phase<=17;phase++)if(!(v6_done&(1u<<phase))){p9_browser=phase;break;}
  int v6_layer=0;
  if(v6_done&(1u<<5))for(int phase=6;phase<=9;phase++)if(!(v6_done&(1u<<phase))){v6_layer=phase;break;}
  g_v6_hide_text=(v6_layer==6||v6_layer==7);
- if(v6_layer||p9_browser)g_ui_dirty=1;
+ if(v6_layer||p9_browser||p10_browser)g_ui_dirty=1;
  if(!(v6_done&(1u<<5)))g_ui_dirty=1;
  /* Details owns a complete deterministic RSX frame.  Do this before every
     legacy archive fast path so no software framebuffer renderer participates
@@ -3858,7 +3868,22 @@ static void draw(){
  g_5c_off[0]=phase5c_cmd_off(); g_5c_stage=0;
  unsigned long long perf_t0=fps_now_us(),perf_t1=0;
  g_perf_text_flushes=0; g_perf_rect_flushes=0; g_perf_line_submits=0;
- if(p9_browser!=16)rsx_draw_background();
+ if(p10_browser==18){
+  rsx_ui_rect(0,0,(int)g_width,(int)g_height,0xFF243E58u);
+ }else if(p10_browser==19){
+  rsx_bg_init(); /* Allocate and initialize background; do not bind/draw it. */
+ }else if(p10_browser==20||p10_browser==21||p10_browser==22){
+  rsx_draw_background();
+  if(p10_browser==21){
+   /* Restore known UI projection, alpha and blend state after textured quad. */
+   tiny3d_Project2D();
+   tiny3d_AlphaTest(1,0x10,TINY3D_ALPHA_FUNC_GEQUAL);
+   tiny3d_BlendFunc(1,
+    (blend_src_func)(TINY3D_BLEND_FUNC_SRC_RGB_SRC_ALPHA | TINY3D_BLEND_FUNC_SRC_ALPHA_SRC_ALPHA),
+    (blend_dst_func)(TINY3D_BLEND_FUNC_SRC_ALPHA_ONE_MINUS_SRC_ALPHA | TINY3D_BLEND_FUNC_SRC_RGB_ONE_MINUS_SRC_ALPHA),
+    (blend_func)(TINY3D_BLEND_RGB_FUNC_ADD | TINY3D_BLEND_ALPHA_FUNC_ADD));
+  }
+ }else if(p9_browser!=16)rsx_draw_background();
  perf_t1=fps_now_us(); perf_avg(&g_perf_bg_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[1]=phase5c_cmd_off(); g_5c_stage=1;
  g_rsx_ui_overlay=1;
  const char *title="PS2 PSU Manager v1.64";
