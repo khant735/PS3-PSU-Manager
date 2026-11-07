@@ -2738,8 +2738,12 @@ static void v6_save(){
   txt_ok=!ferror(f);if(fclose(f)!=0)txt_ok=0;
  }
  snprintf(status_line,sizeof(status_line),
-    csv_ok&&txt_ok?"Stage 6V %s: 30s logs SAVED - press X to continue":
+    csv_ok&&txt_ok?"Stage 6V %s: 30s logs saved to HDD":
                    "Stage 6V %s: LOG SAVE FAILED - check HDD",base);
+ snprintf(success_line,sizeof(success_line),
+    csv_ok&&txt_ok?"Stage 6V: %s 30-second recording complete - logs saved":
+                   "Stage 6V: %s recording finished - LOG SAVE FAILED",base);
+ success_frames=240;
  g_ui_dirty=1;
 }
 
