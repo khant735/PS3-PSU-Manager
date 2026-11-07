@@ -2653,6 +2653,11 @@ static void update_fps_counter(){
   g_fps_window_start_us=now;
  }
 }
+/* Stage 6V Phase 2: passive, in-memory stall observations. No GPU calls,
+   allocations, filesystem writes or changes to the flip path. */
+static volatile u32 g_6v_long_flip_count=0;
+static volatile u32 g_6v_max_flip_us=0;
+static volatile u32 g_6v_last_get=0,g_6v_last_put=0;
 static void present(){
  rsx_flush_text_batch();
  rsx_flush_rect_batch();
@@ -2673,6 +2678,15 @@ static void present(){
  tiny3d_Flip();
  g_4x_probe_active=0;
  unsigned long long after_flip=fps_now_us();
+ /* Capture only after the normal Tiny3D flip has returned. These counters
+    are observational; do not attempt GPU recovery from the render thread. */
+ {
+  unsigned long long elapsed=after_flip-before_flip;
+  if(elapsed>100000ULL)++g_6v_long_flip_count;
+  if(elapsed>g_6v_max_flip_us)g_6v_max_flip_us=(elapsed>0xFFFFFFFFULL)?0xFFFFFFFFu:(u32)elapsed;
+  gcmControlRegister *cr=gcmGetControlRegister();
+  if(cr){g_6v_last_get=cr->get;g_6v_last_put=cr->put;}
+ }
  {
   unsigned long long e=g_4x_first_status_us?g_4x_first_status_us:after_flip;
   unsigned long long r=g_4x_reset_us?g_4x_reset_us:e;
