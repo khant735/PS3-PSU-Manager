@@ -43,7 +43,7 @@ jobs:
           sudo tar --zstd -xf /tmp/ps3dev-compiler.tar.zst -C /opt
           echo "$EXPECTED_TINY3D_SHA256  $PS3DEV/portlibs/ppu/lib/libtiny3d.a" | sha256sum -c -
           test -f "$PSL1GHT/ppu_rules"
-          test -x "$PS3DEV/ppu/bin/ppu-g++"
+          test -x "$PS3DEV/ppu/bin/powerpc64-ps3-elf-g++"
       - name: Build ELF SELF PKG
         env:
           PATH: /opt/ps3dev/bin:/opt/ps3dev/ppu/bin:/usr/local/bin:/usr/bin:/bin
