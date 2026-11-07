@@ -2650,11 +2650,67 @@ static void update_fps_counter(){
   g_fps_window_start_us=now;
  }
 }
+/* Phase FT1: bounded, passive startup frame-timing capture. No disk I/O
+   in the rendering hot path; write once after 600 presented frames. */
+#define PSU_FT_SAMPLES 600
+typedef struct {
+ unsigned long long end_us;
+ float draw_ms, flip_ms, frame_ms;
+ unsigned int vb_delta, vb_total;
+ int back_before, back_after, flip_status;
+} psu_ft_sample_t;
+static psu_ft_sample_t g_ft_samples[PSU_FT_SAMPLES];
+static unsigned int g_ft_count=0;
+static void psu_ft_record(unsigned long long end_us,float draw_ms,float flip_ms,
+                          float frame_ms,unsigned int vb_delta,unsigned int vb_total,
+                          int back_before,int back_after,int flip_status){
+ if(g_ft_count>=PSU_FT_SAMPLES)return;
+ psu_ft_sample_t *p=&g_ft_samples[g_ft_count++];
+ p->end_us=end_us;p->draw_ms=draw_ms;p->flip_ms=flip_ms;
+ p->frame_ms=frame_ms;p->vb_delta=vb_delta;p->vb_total=vb_total;
+ p->back_before=back_before;p->back_after=back_after;p->flip_status=flip_status;
+ if(g_ft_count!=PSU_FT_SAMPLES)return;
+ FILE *csv=fopen("/dev_hdd0/tmp/ps3psu_frame_timing.csv","wb");
+ FILE *summary=fopen("/dev_hdd0/tmp/ps3psu_frame_summary.txt","wb");
+ if(csv)fprintf(csv,"frame,end_us,draw_ms,flip_ms,frame_ms,vblanks,vblank_total,buffer_before,buffer_after,flip_status_before\\n");
+ double draw_sum=0,flip_sum=0,frame_sum=0,draw_max=0,flip_max=0,frame_max=0;
+ unsigned int late=0,missed=0,buffer_same=0,valid_frames=0;
+ for(unsigned int i=0;i<g_ft_count;i++){
+  const psu_ft_sample_t *q=&g_ft_samples[i];
+  if(csv)fprintf(csv,"%u,%llu,%.3f,%.3f,%.3f,%u,%u,%d,%d,%d\\n",
+     i+1,q->end_us,q->draw_ms,q->flip_ms,q->frame_ms,q->vb_delta,
+     q->vb_total,q->back_before,q->back_after,q->flip_status);
+  draw_sum+=q->draw_ms;flip_sum+=q->flip_ms;
+  if(q->draw_ms>draw_max)draw_max=q->draw_ms;
+  if(q->flip_ms>flip_max)flip_max=q->flip_ms;
+  if(q->frame_ms>0){frame_sum+=q->frame_ms;valid_frames++;
+   if(q->frame_ms>17.5f)late++;
+   if(q->frame_ms>33.5f)missed++;
+   if(q->frame_ms>frame_max)frame_max=q->frame_ms;
+  }
+  if(q->back_before==q->back_after)buffer_same++;
+ }
+ if(csv)fclose(csv);
+ if(summary){
+  fprintf(summary,"PS3 PSU Manager FT1 - 600 presented frames (startup capture)\\n");
+  fprintf(summary,"Average draw: %.3f ms; maximum: %.3f ms\\n",draw_sum/g_ft_count,draw_max);
+  fprintf(summary,"Average flip: %.3f ms; maximum: %.3f ms\\n",flip_sum/g_ft_count,flip_max);
+  fprintf(summary,"Average frame: %.3f ms; maximum: %.3f ms\\n",valid_frames?frame_sum/valid_frames:0.0,frame_max);
+  fprintf(summary,"Frames >17.5 ms: %u; frames >33.5 ms: %u\\n",late,missed);
+  fprintf(summary,"VBlank deltas >1: ");
+  unsigned int vb_multi=0;
+  for(unsigned int i=0;i<g_ft_count;i++)if(g_ft_samples[i].vb_delta>1)vb_multi++;
+  fprintf(summary,"%u; unchanged buffer index: %u\\n",vb_multi,buffer_same);
+  fprintf(summary,"Measurements are CPU-side timing/counters, not proof of GPU completion or scanout ownership.\\n");
+  fclose(summary);
+ }
+}
 static void present(){
  rsx_flush_text_batch();
  rsx_flush_rect_batch();
  unsigned long long before_flip=fps_now_us();
  unsigned int vb_before=g_vblank_count;
+ int ft_back_before=Video_currentBuffer;
  g_perf_flip_status_before=gcmGetFlipStatus();
  float draw_ms=(g_perf_draw_begin_us && before_flip>=g_perf_draw_begin_us)?
    (float)(before_flip-g_perf_draw_begin_us)/1000.0f:0.0f;
@@ -2718,6 +2774,7 @@ static void present(){
  else {g_perf_draw_ms+=(draw_ms-g_perf_draw_ms)*a;g_perf_flip_ms+=(flip_ms-g_perf_flip_ms)*a;if(frame_ms>0.0f)g_perf_frame_ms+=(frame_ms-g_perf_frame_ms)*a;}
  if(g_perf_samples<1000000)g_perf_samples++;
  g_back=Video_currentBuffer;
+ psu_ft_record(after_flip,draw_ms,flip_ms,frame_ms,vb_delta,vb_after,ft_back_before,Video_currentBuffer,g_perf_flip_status_before);
 }
 static void shutdown_video(){if(g_ctx){gcmSetFlipHandler(NULL);gcmSetVBlankHandler(NULL);tiny3d_Exit(); g_ctx=NULL;} free(g_bg_cache); g_bg_cache=NULL; g_bg_cache_ready=0; free(g_list_base_cache); g_list_base_cache=NULL; g_list_cache_valid=0; free(g_model_cache); g_model_cache=NULL; free(g_model_filter_cache); g_model_filter_cache=NULL; free(g_model_zbuf); g_model_zbuf=NULL; g_model_cache_valid=0; free(g_model_base_cache); g_model_base_cache=NULL; g_model_base_valid=0; free(g_model_sx);g_model_sx=NULL;free(g_model_sy);g_model_sy=NULL;free(g_model_zinv);g_model_zinv=NULL;free(g_model_nx);g_model_nx=NULL;free(g_model_ny);g_model_ny=NULL;g_model_vertex_cap=0; free(g_preview_base_cache); g_preview_base_cache=NULL; g_preview_base_valid=0; free(g_rename_base_cache); g_rename_base_cache=NULL; free(g_rename_composite_cache); g_rename_composite_cache=NULL; free(g_rename_pristine_cache); g_rename_pristine_cache=NULL;}
 static void sysutil_cb(u64 status,u64 param,void *userdata){
