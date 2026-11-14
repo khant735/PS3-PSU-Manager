@@ -3232,7 +3232,7 @@ static int draw_fast_list_update(){
   int saved=selected;selected=-1;
   for(int row=0;row<visible;row++){int i=top_index+row;if(i>=item_count)break;draw_cached_list_row(i,row);}selected=saved;
   capture_list_base(g_list_x-8,g_list_cache_rows_y-4,g_list_cache_right-(g_list_x-8)-12,visible*g_row_h+8);
-  if((p11_browser==27||p11_browser==28) && selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
+  if(selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
   copy_region_between_buffers(g_list_panel_x,g_list_panel_y,g_list_panel_w,g_list_panel_h);
  }
  g_list_prev_selected=selected;
@@ -4014,12 +4014,14 @@ static void draw(){
   if(!archive_mode&&clipboard[0]){char item_path[PATHSZ];join(item_path,sizeof(item_path),cwd,items[i].name);copied=!strcmp(item_path,clipboard);}
   int yy=rows_y+row*g_row_h;
   int row_x=g_list_x-8,row_w=list_right-row_x-12;
-  if(p11_browser==24 || p11_browser==27 || p11_browser==28) {\n  if(i==selected){
+  if(p11_browser==24 || p11_browser==27 || p11_browser==28) {
+  if(i==selected){
    round_rect(row_x,yy-4,row_w,g_row_h,5,archive_mode&&export_target_active?0xFFA46C24u:0xFF215F8Cu);
    rect(row_x+1,yy-3,4,g_row_h-2,archive_mode&&export_target_active?0xFFFFCF6Cu:0xFF79D6FFu);
   }else if(row&1) round_rect(row_x,yy-4,row_w,g_row_h,4,0x4A1B2B3Au);
   rect(row_x+8,yy+g_row_h-5,row_w-16,1,0x304D718Au);
-  }\n  u32 c=copied?0xFFFF7B7Bu:((i==selected)?0xFFFFFFFFu:0xFFE6EDF3u);
+  }
+  u32 c=copied?0xFFFF7B7Bu:((i==selected)?0xFFFFFFFFu:0xFFE6EDF3u);
   char sizebuf[32],datebuf[32]; format_file_size(items[i].size,items[i].is_dir,sizebuf,sizeof(sizebuf)); format_file_date(items[i].latest_time,items[i].date_known,datebuf,sizeof(datebuf));
   int sizew=text_width(sizebuf,g_body_scale),datew=text_width(datebuf,g_body_scale);
   int size_col_w=text_width("999.9 MB",g_body_scale)+18; if(size_col_w<sizew+8)size_col_w=sizew+8;
@@ -4028,15 +4030,19 @@ static void draw(){
   int text_area=date_right-date_col_w-g_list_x-icon_space-14;
   int name_chars=text_area/scale125(6*g_body_scale)-1; if(name_chars<6)name_chars=6;
   int icon_y=yy+4;
-  if(p11_browser==25 || p11_browser==27 || p11_browser==28) {\n  if(items[i].is_dir)draw_folder_icon(g_list_x+5,icon_y,icon_size,i==selected); else {const u32 *thumb=archive_mode?NULL:browser_archive_thumb(items[i].name);if(thumb)draw_texture_scaled(g_list_x+5,icon_y,128,128,thumb);else draw_file_icon(g_list_x+5,icon_y,icon_size,items[i].name,i==selected);}
-  }\n  if(p11_browser==26 || p11_browser==27 || p11_browser==28) {\n  char namebuf[320]; snprintf(namebuf,sizeof(namebuf),"%-*.*s",name_chars,name_chars,items[i].name);
+  if(p11_browser==25 || p11_browser==27 || p11_browser==28) {
+  if(items[i].is_dir)draw_folder_icon(g_list_x+5,icon_y,icon_size,i==selected); else {const u32 *thumb=archive_mode?NULL:browser_archive_thumb(items[i].name);if(thumb)draw_texture_scaled(g_list_x+5,icon_y,128,128,thumb);else draw_file_icon(g_list_x+5,icon_y,icon_size,items[i].name,i==selected);}
+  }
+  if(p11_browser==26 || p11_browser==27 || p11_browser==28) {
+  char namebuf[320]; snprintf(namebuf,sizeof(namebuf),"%-*.*s",name_chars,name_chars,items[i].name);
   text(g_list_x+icon_space+5,yy,namebuf,c,g_body_scale);
   text(date_right-datew,yy,datebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);
-  text(list_right-sizew-10,yy,sizebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);\n  }
+  text(list_right-sizew-10,yy,sizebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);
+  }
  }
  selected=saved_selected_for_cache;
  if(!g_rsx_ui_overlay) capture_list_base(g_list_x-8,rows_y-4,list_right-(g_list_x-8)-12,visible*g_row_h+8);
- if(selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
+ if((p11_browser==27||p11_browser==28) && selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
  g_list_prev_selected=selected;
  g_list_prev_top=top_index;
  perf_t1=fps_now_us(); perf_avg(&g_perf_list_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[3]=phase5c_cmd_off(); g_5c_stage=3;
