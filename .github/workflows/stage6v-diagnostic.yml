@@ -150,19 +150,20 @@ jobs:
           else
             echo 'No curated supplemental dates supplied; using GameDB-PS2 baseline'
           fi
-      - name: Verify Phase 13 diagnostic scene wiring
+      - name: Verify Phase 14 row isolation wiring
         run: |
           python3 - <<'PY'
           from pathlib import Path
           src=Path('source/main.cpp').read_text()
-          for token in ['for(int phase=24;phase<=29;phase++)',
-                        'p13_title_path', 'p13_list_shell', 'p13_list_rows',
-                        'p13_preview', 'p13_full_browser', 'p13_reference',
-                        'if(p11_browser==24)', 'if(p11_browser==25)',
-                        'if(p11_browser==26)', 'if(p11_browser==27)',
-                        'if(p11_browser>=24 && p11_browser<=28)']:
-              assert token in src, f'Missing Phase 13 token: {token}'
-          print('Phase 13 scene wiring checks passed')
+          for token in ['p14_row_backgrounds', 'p14_row_icons',
+                        'p14_row_text', 'p14_rows_combined',
+                        'p14_full_browser', 'p14_reference',
+                        'p11_browser==24 || p11_browser==27',
+                        'p11_browser==25 || p11_browser==27',
+                        'p11_browser==26 || p11_browser==27',
+                        'p11_browser>=24 && p11_browser<=27']:
+              assert token in src, f'Missing Phase 14 token: {token}'
+          print('Phase 14 row isolation checks passed')
           PY
       - name: Build ELF SELF PKG
         env:
@@ -191,5 +192,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Stage 6V Phase 2 diagnostic run ${GITHUB_RUN_NUMBER}" \
-            --notes "Phase 13 six-scene 30-second actual browser layer isolation: title, list shell, rows, preview, full UI and reference. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
+            --notes "Phase 14 six-scene 30-second browser row isolation: backgrounds, icons, text, combined rows, full UI and reference. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
             --prerelease
