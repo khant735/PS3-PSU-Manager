@@ -150,22 +150,24 @@ jobs:
           else
             echo 'No curated supplemental dates supplied; using GameDB-PS2 baseline'
           fi
-      - name: Verify Phase 11 diagnostic scene wiring
+      - name: Verify Phase 12 diagnostic scene wiring
         run: |
           python3 - <<'PY'
           from pathlib import Path
           src=Path('source/main.cpp').read_text()
           checks={
-              'Phase 11 scheduler': 'for(int phase=24;phase<=29;phase++)',
-              'Phase 11 completion mask': '((1u<<30)-1u)&~((1u<<24)-1u)',
-              'Phase 11 textured quad isolation': 'PHASE 11 D - TEXTURED QUAD ONLY',
-              'Phase 11 texture bind isolation': 'if(p11_browser==26)',
-              'Phase 11 browser baseline': 'if(p11_browser==28)',
-              'Phase 11 reference': 'p8_scene=29',
+              'Phase 12 scheduler': 'for(int phase=24;phase<=29;phase++)',
+              'Phase 12 completion mask': '((1u<<30)-1u)&~((1u<<24)-1u)',
+              'Phase 12 clear only': 'PHASE 12 A - CLEAR ONLY',
+              'Phase 12 opaque cover': 'PHASE 12 B - OPAQUE COVER',
+              'Phase 12 background panels': 'PHASE 12 C - BACKGROUND PANELS',
+              'Phase 12 text and panels': 'PHASE 12 D - BACKGROUND PANELS TEXT',
+              'Phase 12 browser': 'Phase 12 E: complete browser.',
+              'Phase 12 reference': 'p8_scene=29',
           }
           for label,token in checks.items():
               assert token in src, f'Missing {label}: {token}'
-          print('Phase 11 scene wiring checks passed')
+          print('Phase 12 scene wiring checks passed')
           PY
       - name: Build ELF SELF PKG
         env:
@@ -194,5 +196,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Stage 6V Phase 2 diagnostic run ${GITHUB_RUN_NUMBER}" \
-            --notes "Phase 11 six-scene 30-second background texture initialization/binding/quad isolation diagnostics. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
+            --notes "Phase 12 six-scene 30-second framebuffer clear, opaque cover, textured panels, text, full browser and reference diagnostics. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
             --prerelease
