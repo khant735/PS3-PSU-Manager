@@ -2715,7 +2715,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":scene==23?"p10_reference":scene==24?"p13_title_path":scene==25?"p13_list_shell":scene==26?"p13_list_rows":scene==27?"p13_preview":scene==28?"p13_full_browser":"p13_reference";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":scene==23?"p10_reference":scene==24?"p14_row_backgrounds":scene==25?"p14_row_icons":scene==26?"p14_row_text":scene==27?"p14_rows_combined":scene==28?"p14_full_browser":"p14_reference";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -3232,7 +3232,7 @@ static int draw_fast_list_update(){
   int saved=selected;selected=-1;
   for(int row=0;row<visible;row++){int i=top_index+row;if(i>=item_count)break;draw_cached_list_row(i,row);}selected=saved;
   capture_list_base(g_list_x-8,g_list_cache_rows_y-4,g_list_cache_right-(g_list_x-8)-12,visible*g_row_h+8);
-  if(selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
+  if((p11_browser==27||p11_browser==28) && selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
   copy_region_between_buffers(g_list_panel_x,g_list_panel_y,g_list_panel_w,g_list_panel_h);
  }
  g_list_prev_selected=selected;
@@ -3800,7 +3800,7 @@ static void draw(){
     text(px+6,py+9,"RSX TEXT 0123",0xFFFFFFFFu,1);
    }
   }
-  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":p8_scene==23?"PHASE 10 F - REFERENCE":p8_scene==29?"PHASE 13 F - REFERENCE":"PHASE 9 A - REFERENCE COMBINED";
+  const char *label=p8_scene==10?"PHASE 8 A - RECTANGLES":p8_scene==11?"PHASE 8 B - ROUNDED PANELS":p8_scene==12?"PHASE 8 C - GRADIENTS":p8_scene==13?"PHASE 8 D - TEXT":p8_scene==14?"PHASE 8 E - COMBINED":p8_scene==23?"PHASE 10 F - REFERENCE":p8_scene==29?"PHASE 14 F - REFERENCE":"PHASE 9 A - REFERENCE COMBINED";
   rsx_ui_rect(0,0,(int)g_width,64,0xFF122C48u);
   rsx_ui_text_raw(20,16,label,0xFFFFFFFFu,2);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
@@ -3874,7 +3874,7 @@ static void draw(){
  unsigned long long perf_t0=fps_now_us(),perf_t1=0;
  g_perf_text_flushes=0; g_perf_rect_flushes=0; g_perf_line_submits=0;
  if(p11_browser>=24 && p11_browser<=28){
-  rsx_draw_background(); /* Phase 13 E: complete browser. */
+  rsx_draw_background(); /* Phase 14 E: complete browser. */
  }else if(p10_browser==18){
   rsx_ui_rect(0,0,(int)g_width,(int)g_height,0xFF243E58u);
  }else if(p10_browser==19){
@@ -3982,11 +3982,6 @@ static void draw(){
  int list_panel_h=list_panel_height_for_visible(browser_header_h,visible);
  int max_panel_h=footer_y-list_panel_y-12; if(list_panel_h>max_panel_h)list_panel_h=max_panel_h;
  browser_list_card(g_list_x-14,list_panel_y,list_right-(g_list_x-14),list_panel_h,0xC0121D29u,0xD06A8DA8u,9);
- /* Phase 13: actual browser through layer 24. */
- if(p11_browser==24){
-  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
-  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
- }
  /* Explorer-style column header */
  browser_column_header(g_list_x-9,list_panel_y+5,list_right-g_list_x-2,browser_header_h-9);
  if(!archive_mode && !g_rsx_ui_overlay){
@@ -4013,23 +4008,18 @@ static void draw(){
  int icon_space=icon_size+18;
  int saved_selected_for_cache=selected;
  selected=-1; /* render stable unselected rows once; selection becomes an overlay */
- /* Phase 13: actual browser through layer 25. */
- if(p11_browser==25){
-  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
-  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
- }
  for(int row=0;row<visible;row++){
   int i=top_index+row; if(i>=item_count)break;
   int copied=0;
   if(!archive_mode&&clipboard[0]){char item_path[PATHSZ];join(item_path,sizeof(item_path),cwd,items[i].name);copied=!strcmp(item_path,clipboard);}
   int yy=rows_y+row*g_row_h;
   int row_x=g_list_x-8,row_w=list_right-row_x-12;
-  if(i==selected){
+  if(p11_browser==24 || p11_browser==27 || p11_browser==28) {\n  if(i==selected){
    round_rect(row_x,yy-4,row_w,g_row_h,5,archive_mode&&export_target_active?0xFFA46C24u:0xFF215F8Cu);
    rect(row_x+1,yy-3,4,g_row_h-2,archive_mode&&export_target_active?0xFFFFCF6Cu:0xFF79D6FFu);
   }else if(row&1) round_rect(row_x,yy-4,row_w,g_row_h,4,0x4A1B2B3Au);
   rect(row_x+8,yy+g_row_h-5,row_w-16,1,0x304D718Au);
-  u32 c=copied?0xFFFF7B7Bu:((i==selected)?0xFFFFFFFFu:0xFFE6EDF3u);
+  }\n  u32 c=copied?0xFFFF7B7Bu:((i==selected)?0xFFFFFFFFu:0xFFE6EDF3u);
   char sizebuf[32],datebuf[32]; format_file_size(items[i].size,items[i].is_dir,sizebuf,sizeof(sizebuf)); format_file_date(items[i].latest_time,items[i].date_known,datebuf,sizeof(datebuf));
   int sizew=text_width(sizebuf,g_body_scale),datew=text_width(datebuf,g_body_scale);
   int size_col_w=text_width("999.9 MB",g_body_scale)+18; if(size_col_w<sizew+8)size_col_w=sizew+8;
@@ -4038,11 +4028,11 @@ static void draw(){
   int text_area=date_right-date_col_w-g_list_x-icon_space-14;
   int name_chars=text_area/scale125(6*g_body_scale)-1; if(name_chars<6)name_chars=6;
   int icon_y=yy+4;
-  if(items[i].is_dir)draw_folder_icon(g_list_x+5,icon_y,icon_size,i==selected); else {const u32 *thumb=archive_mode?NULL:browser_archive_thumb(items[i].name);if(thumb)draw_texture_scaled(g_list_x+5,icon_y,128,128,thumb);else draw_file_icon(g_list_x+5,icon_y,icon_size,items[i].name,i==selected);}
-  char namebuf[320]; snprintf(namebuf,sizeof(namebuf),"%-*.*s",name_chars,name_chars,items[i].name);
+  if(p11_browser==25 || p11_browser==27 || p11_browser==28) {\n  if(items[i].is_dir)draw_folder_icon(g_list_x+5,icon_y,icon_size,i==selected); else {const u32 *thumb=archive_mode?NULL:browser_archive_thumb(items[i].name);if(thumb)draw_texture_scaled(g_list_x+5,icon_y,128,128,thumb);else draw_file_icon(g_list_x+5,icon_y,icon_size,items[i].name,i==selected);}
+  }\n  if(p11_browser==26 || p11_browser==27 || p11_browser==28) {\n  char namebuf[320]; snprintf(namebuf,sizeof(namebuf),"%-*.*s",name_chars,name_chars,items[i].name);
   text(g_list_x+icon_space+5,yy,namebuf,c,g_body_scale);
   text(date_right-datew,yy,datebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);
-  text(list_right-sizew-10,yy,sizebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);
+  text(list_right-sizew-10,yy,sizebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);\n  }
  }
  selected=saved_selected_for_cache;
  if(!g_rsx_ui_overlay) capture_list_base(g_list_x-8,rows_y-4,list_right-(g_list_x-8)-12,visible*g_row_h+8);
@@ -4050,8 +4040,8 @@ static void draw(){
  g_list_prev_selected=selected;
  g_list_prev_top=top_index;
  perf_t1=fps_now_us(); perf_avg(&g_perf_list_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[3]=phase5c_cmd_off(); g_5c_stage=3;
- /* Phase 13: actual browser through layer 26. */
- if(p11_browser==26){
+ /* Phase 14: end isolated row scenes before preview/footer overlays. */
+ if(p11_browser>=24 && p11_browser<=27){
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;present();g_frame_counter++;return;
  }
@@ -4065,11 +4055,6 @@ static void draw(){
   draw_preview_panel(panel_x,panel_y,panel_w2,panel_h);
  }else g_preview_base_valid=0;
  perf_t1=fps_now_us(); perf_avg(&g_perf_preview_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[4]=phase5c_cmd_off(); g_5c_stage=4;
- /* Phase 13: actual browser through layer 27. */
- if(p11_browser==27){
-  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
-  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
- }
  /* modern command bar / status bar.  Keep the silver/grey command
     background behind every wrapped legend row, including the second
     filesystem row containing R3 FOLDER->PSU.  Older builds relied on
