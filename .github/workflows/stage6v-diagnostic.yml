@@ -150,6 +150,23 @@ jobs:
           else
             echo 'No curated supplemental dates supplied; using GameDB-PS2 baseline'
           fi
+      - name: Verify Phase 11 diagnostic scene wiring
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          src=Path('source/main.cpp').read_text()
+          checks={
+              'Phase 11 scheduler': 'for(int phase=24;phase<=29;phase++)',
+              'Phase 11 completion mask': '((1u<<30)-1u)&~((1u<<24)-1u)',
+              'Phase 11 textured quad isolation': 'PHASE 11 D - TEXTURED QUAD ONLY',
+              'Phase 11 texture bind isolation': 'if(p11_browser==26)',
+              'Phase 11 browser baseline': 'if(p11_browser==28)',
+              'Phase 11 reference': 'p8_scene=29',
+          }
+          for label,token in checks.items():
+              assert token in src, f'Missing {label}: {token}'
+          print('Phase 11 scene wiring checks passed')
+          PY
       - name: Build ELF SELF PKG
         env:
           PATH: /opt/ps3dev/bin:/opt/ps3dev/ppu/bin:/usr/local/bin:/usr/bin:/bin
@@ -177,5 +194,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Stage 6V Phase 2 diagnostic run ${GITHUB_RUN_NUMBER}" \
-            --notes "30-second main-menu and ICN preview RAM-buffered diagnostics. Experimental test only; no automatic XMB exit. Built from stage6v-phase2-observation-only." \
+            --notes "Phase 11 six-scene 30-second background texture initialization/binding/quad isolation diagnostics. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
             --prerelease
