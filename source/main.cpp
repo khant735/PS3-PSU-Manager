@@ -3809,6 +3809,24 @@ static void draw(){
  }
  int p11_browser=0;
  for(int phase=24;phase<=28;phase++)if(!(v6_done&(1u<<phase))){p11_browser=phase;break;}
+ if(p11_browser==27){
+  /* Phase 11D: draw only the background textured quad, no browser primitives.
+     This differs deliberately from 11E, which draws the complete browser. */
+  g_v6_hide_text=0;
+  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+  tiny3d_AlphaTest(1,0x10,TINY3D_ALPHA_FUNC_GEQUAL);
+  tiny3d_BlendFunc(1,
+   (blend_src_func)(TINY3D_BLEND_FUNC_SRC_RGB_SRC_ALPHA | TINY3D_BLEND_FUNC_SRC_ALPHA_SRC_ALPHA),
+   (blend_dst_func)(TINY3D_BLEND_FUNC_SRC_ALPHA_ONE_MINUS_SRC_ALPHA | TINY3D_BLEND_FUNC_SRC_RGB_ONE_MINUS_SRC_ALPHA),
+   (blend_func)(TINY3D_BLEND_RGB_FUNC_ADD | TINY3D_BLEND_ALPHA_FUNC_ADD));
+  tiny3d_Project2D();g_rsx_ui_overlay=1;
+  rsx_draw_background();
+  rsx_ui_rect(0,0,(int)g_width,54,0xFF122C48u);
+  rsx_ui_text_raw(20,14,"PHASE 11 D - TEXTURED QUAD ONLY",0xFFFFFFFFu,2);
+  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
+  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
+ }
+
  int p10_browser=0;
  if(!p11_browser && !(v6_done&(1u<<29)))for(int phase=18;phase<=22;phase++)if(!(v6_done&(1u<<phase))){p10_browser=phase;break;}
  int p9_browser=0;
@@ -3882,8 +3900,6 @@ static void draw(){
     PS2_BG_W*4,TINY3D_TEX_FORMAT_A8R8G8B8,
     TEXTWRAP_CLAMP,TEXTWRAP_CLAMP,TEXTURE_LINEAR);
   /* Bind texture without submitting background geometry. */
- }else if(p11_browser==27){
-  rsx_draw_background(); /* Textured quad, then browser UI. */
  }else if(p11_browser==28){
   rsx_draw_background(); /* Full normal browser textured baseline. */
  }else if(p10_browser==18){
