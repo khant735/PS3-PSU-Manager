@@ -163,6 +163,13 @@ jobs:
                         'p11_browser==26 || p11_browser==27',
                         'p11_browser>=24 && p11_browser<=27']:
               assert token in src, f'Missing Phase 14 token: {token}'
+          # Source-level guard: escaped newline tokens accidentally inserted
+          # into C++ control-flow previously broke the Phase 14 compile.
+          rows=src.split('selected=-1; /* render stable unselected rows once; selection becomes an overlay */',1)[1].split('selected=saved_selected_for_cache;',1)[0]
+          assert '\\n' not in rows, 'Literal backslash-n sequence in Phase 14 row renderer'
+          # Browser-local phase identifier must not leak into the fast-list helper.
+          fast=src.split('static int draw_fast_list_update()',1)[1].split('static void draw(){',1)[0]
+          assert 'p11_browser' not in fast, 'Browser phase identifier escaped into fast-list renderer'
           print('Phase 14 row isolation checks passed')
           PY
       - name: Build ELF SELF PKG
