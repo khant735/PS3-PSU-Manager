@@ -4044,12 +4044,13 @@ static int v6_gpu_texture_workload(){
    if(total_us>16667u)++over;
    if(total_us>max_total)max_total=total_us;
    total_sum+=total_us;write_sum+=t1-t0;submit_sum+=t2-t1;present_sum+=t3-t2;
-   fprintf(f,"%s,%s,%u,%d,%llu,%llu,%llu,%llu,%u,native_texture_binding\n",
+   fprintf(f,"%s,%s,%u,%d,%llu,%llu,%llu,%llu,%u,%s\n",
      mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"ARGB1555":"DXT1_decoded_RGB565",
      mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":"RGB565",
      W*H*(mode==0?4:2),rep,(unsigned long long)(t1-t0),
      (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),
-     (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL));
+     (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL),
+     mode==3?"cpu_DXT1_decode_to_RGB565_then_native_binding":"native_texture_binding");
   }
   if(summary)fprintf(summary,"%s,%u,%u,%u,%llu,%llu,%llu,%llu,%u\n",
     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":"DXT1_decoded_RGB565",
