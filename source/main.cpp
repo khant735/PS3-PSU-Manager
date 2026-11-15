@@ -3813,6 +3813,23 @@ static void draw(){
  /* Completion prompt appears only after the last CSV and summary are saved. */
  const unsigned v6_required_mask=((1u<<30)-1u)&~((1u<<24)-1u);
  if((v6_done&v6_required_mask)==v6_required_mask && !v6_pending){
+  /* Unattended run: write completion marker exactly once, without input. */
+  static int unattended_manifest_written=0;
+  if(!unattended_manifest_written){
+   unattended_manifest_written=1;
+   const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
+   mkdir(dir,0777);
+   char marker[256];snprintf(marker,sizeof(marker),"%s/automatic_run_complete.txt",dir);
+   FILE *mf=fopen(marker,"wb");
+   if(mf){
+    fprintf(mf,"PS3 PSU Manager Stage 6V unattended diagnostics\n");
+    fprintf(mf,"All six 30-second scenes completed automatically.\n");
+    fprintf(mf,"Scenes: p15_shell_no_rows,p15_background_text,p15_icons_text,p15_combined_rows,p15_full_browser,p15_reference\n");
+    fprintf(mf,"Frame budget: 16667 microseconds; see each scene summary for overruns.\n");
+    fprintf(mf,"No controller input is required for testing or log capture.\n");
+    fclose(mf);
+   }
+  }
   g_v6_hide_text=0;
   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
   tiny3d_Project2D();g_rsx_ui_overlay=1;
@@ -3821,7 +3838,7 @@ static void draw(){
   rsx_ui_text_raw(52,(int)g_height/2-70,"ALL DIAGNOSTIC TESTS COMPLETE",0xFFFFFFFFu,2);
   rsx_ui_text_raw(52,(int)g_height/2-12,"CSV AND SUMMARY FILES SAVED TO:",0xFFB5E6FFu,1);
   rsx_ui_text_raw(52,(int)g_height/2+16,"/dev_hdd0/tmp/ps3psu_stage6v/",0xFFFFFFFFu,1);
-  rsx_ui_text_raw(52,(int)g_height/2+56,"PRESS PS BUTTON / HOME TO RETURN TO XMB",0xFFFFFF90u,1);
+  rsx_ui_text_raw(52,(int)g_height/2+56,"TESTS FINISHED - NO INPUT REQUIRED",0xFFFFFF90u,1);
   rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
   g_rsx_ui_overlay=0;present();g_frame_counter++;return;
  }
