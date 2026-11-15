@@ -2791,6 +2791,23 @@ static void v6_save(){
           v6_n?total_draw/1000.0/v6_n:0.0,v6_n?total_flip/1000.0/v6_n:0.0);
   fprintf(f,"Max frame ms: %.3f\nMax flip ms: %.3f\nStalls >100ms: %u\n",
           max_dt/1000.0,max_flip/1000.0,stalls);
+  /* Phase 16.3: hard 60 Hz frame budget and upload correlation; post-capture only. */
+  unsigned over_budget=0,over_22fps=0,upload_frames=0,upload_over_budget=0;
+  unsigned max_upload_bytes=0;
+  unsigned long long upload_total_bytes=0;
+  for(unsigned i=1;i<v6_n;i++){
+   const v6_row *p=&v6_rows[i];
+   if(p->dt>16667u)++over_budget;
+   if(p->dt>45455u)++over_22fps;
+   if(p->uploads){
+    ++upload_frames;upload_total_bytes+=p->upload_bytes;
+    if(p->dt>16667u)++upload_over_budget;
+    if(p->upload_bytes>max_upload_bytes)max_upload_bytes=p->upload_bytes;
+   }
+  }
+  fprintf(f,"60 FPS budget: 16.667 ms (16667 us)\nFrames over 60 FPS budget: %u / %u\nFrames below 22 instantaneous FPS: %u\nFrames with texture uploads: %u\nUpload frames over budget: %u\nTotal recorded upload bytes: %llu\nMax bytes uploaded in one frame: %u\n",
+    over_budget,v6_n>1?v6_n-1:0,over_22fps,upload_frames,upload_over_budget,upload_total_bytes,max_upload_bytes);
+
   /* Separate first-five-second statistics to expose transition-only stalls. */
   unsigned long long startup_us=0,start_draw=0,start_flip=0;
   unsigned startup_frames=0,start_stalls=0;
