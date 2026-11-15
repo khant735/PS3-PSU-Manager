@@ -2740,32 +2740,33 @@ static void v6_save(){
   csv_ok=!ferror(f);if(fclose(f)!=0)csv_ok=0;
  }
 
- /* Phase 16: derive slowdown windows from existing frame samples, without
-    adding any work to the GPU presentation path. */
+ /* Phase 16.1: classify every captured frame, without modifying flip timing.
+    0.1 FPS and 1.0 FPS thresholds use integer microsecond intervals.
+    Export all frames: overlapping pre/post windows cannot lose a trigger. */
  char event_path[256];
  snprintf(event_path,sizeof(event_path),"%s/%s_events.csv",dir,base);
- unsigned event_count=0,event_frames=0;int event_ok=0;
+ unsigned event_count=0,major_count=0,event_frames=0;int event_ok=0;
+ const unsigned target_fps=(scene==24||scene==26)?40u:(scene==29?60u:30u);
+ const unsigned minor_threshold=(unsigned)(10000000ULL/(target_fps*10u-1u));
+ const unsigned major_threshold=(unsigned)(1000000ULL/(target_fps-1u));
  FILE *event_file=fopen(event_path,"wb");
  if(event_file){
-  fprintf(event_file,"event_id,offset,frame,interval_us,fps,draw_us,flip_us,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after\n");
-  unsigned threshold=(scene==24||scene==26)?27778u:(scene==29?18519u:38462u);
-  unsigned last_end=0;
+  fprintf(event_file,"frame_index,frame,interval_us,instant_fps,drop_class,within_event_window,draw_us,flip_us,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after,texture_uploads,texture_upload_bytes\n");
   for(unsigned i=1;i<v6_n;i++){
-   if(v6_rows[i].dt<=threshold)continue;
-   unsigned begin=i>8?i-8:0,end=i+13<v6_n?i+13:v6_n;
-   if(event_count&&begin<last_end)begin=last_end;
-   if(begin>=end)continue;
-   ++event_count;
-   for(unsigned j=begin;j<end;j++){
-    const v6_row *p=&v6_rows[j];
-    fprintf(event_file,"%u,%d,%u,%u,%.3f,%u,%u,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u\n",
-      event_count,(int)j-(int)i,p->frame,p->dt,p->dt?1000000.0/p->dt:0.0,
-      p->draw,p->flip,p->vb,p->status,p->pre_get,p->pre_put,p->post_get,p->post_put,
-      p->poll_us,p->queue_us,p->waitcmd_us,p->tail_us,p->polls,p->callbacks,
-      p->buffer_before,p->buffer_after);
-    ++event_frames;
+   const v6_row *p=&v6_rows[i];
+   int cls=p->dt>major_threshold?2:(p->dt>minor_threshold?1:0);
+   if(cls){++event_count;if(cls==2)++major_count;}
+   int nearby=cls!=0;
+   unsigned first=i>8?i-8:1,last=i+12<v6_n?i+12:v6_n-1;
+   if(!nearby)for(unsigned j=first;j<=last;j++){
+    if(v6_rows[j].dt>minor_threshold){nearby=1;break;}
    }
-   last_end=end;
+   fprintf(event_file,"%u,%u,%u,%.4f,%d,%d,%u,%u,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+    i,p->frame,p->dt,p->dt?1000000.0/p->dt:0.0,cls,nearby,
+    p->draw,p->flip,p->vb,p->status,p->pre_get,p->pre_put,p->post_get,p->post_put,
+    p->poll_us,p->queue_us,p->waitcmd_us,p->tail_us,p->polls,p->callbacks,
+    p->buffer_before,p->buffer_after,p->uploads,p->upload_bytes);
+   ++event_frames;
   }
   event_ok=!ferror(event_file);if(fclose(event_file)!=0)event_ok=0;
  }
@@ -2794,7 +2795,7 @@ static void v6_save(){
    startup_frames?start_draw/1000.0/startup_frames:0.0,
    startup_frames?start_flip/1000.0/startup_frames:0.0,start_stalls);
   fprintf(f,"CSV written: %s\n",csv_ok?"yes":"no");
-  fprintf(f,"Slowdown event windows: %u\nEvent frames: %u\nEvent CSV written: %s\n",event_count,event_frames,event_ok?"yes":"no");
+  fprintf(f,"Target FPS: %u\nMinor drop threshold: 0.1 FPS\nMajor drop threshold: 1.0 FPS\nMinor or major events: %u\nMajor events: %u\nEvent CSV frames: %u\nEvent CSV written: %s\n",target_fps,event_count,major_count,event_frames,event_ok?"yes":"no");
   txt_ok=!ferror(f);if(fclose(f)!=0)txt_ok=0;
  }
  snprintf(status_line,sizeof(status_line),
