@@ -420,6 +420,9 @@ extern "C" void *__wrap_rsxtiny_Init(u32 cmdSize,u32 ioSize,const void *ioAddres
  return __real_rsxtiny_Init(effective,ioSize,ioAddress);
 }
 
+/* Phase 16.2: record status transitions during existing flip-status polling. */
+static volatile u32 g_16_status_changes=0,g_16_first_status=0,g_16_last_status=0;
+static volatile unsigned long long g_16_first_change_us=0,g_16_last_change_us=0;
 extern "C" u32 __real_gcmGetFlipStatus(void);
 extern "C" void __real_gcmResetFlipStatus(void);
 extern "C" s32 __real_gcmSetFlip(gcmContextData*,const u8);
@@ -2663,9 +2666,6 @@ static void update_fps_counter(){
 /* Stage 6V Phase 2: passive, in-memory stall observations. No GPU calls,
    allocations, filesystem writes or changes to the flip path. */
 static volatile u32 g_6v_long_flip_count=0;
-/* Phase 16.2: record status transitions during existing flip-status polling. */
-static volatile u32 g_16_status_changes=0,g_16_first_status=0,g_16_last_status=0;
-static volatile unsigned long long g_16_first_change_us=0,g_16_last_change_us=0;
 static volatile u32 g_6v_max_flip_us=0;
 static volatile u32 g_6v_last_get=0,g_6v_last_put=0;
 
