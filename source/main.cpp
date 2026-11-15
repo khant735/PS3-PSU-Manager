@@ -3954,15 +3954,15 @@ static void v6_texture_format_benchmark(){
    RGBA8888, RGB565 and A1R5G5B5 texture bindings;
    no unverified native DXT bindings are issued. */
 static void present();
-static void v6_gpu_texture_workload(){
+static int v6_gpu_texture_workload(){
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
- FILE *f=fopen(path,"wb");if(!f)return;
+ FILE *f=fopen(path,"wb");if(!f)return 0;
  fprintf(f,"source_format,gpu_binding,texture_bytes,frame,texture_write_cpu_us,submit_cpu_us,present_wall_us,total_wall_us,over_16667us,status\n");
  enum {W=128,H=128,COUNT=24};
  u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
  u16 *packed=(u16*)tiny3d_AllocTexture(W*H*2);
- if(!pixels||!packed){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
+ if(!pixels||!packed){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return 0;}
  const u32 rgba_off=tiny3d_TextureOffset(pixels);
  const u32 packed_off=tiny3d_TextureOffset(packed);
  /* A single native-format buffer is reused sequentially. Record the exact
@@ -3970,6 +3970,7 @@ static void v6_gpu_texture_workload(){
  char summary_path[256];
  snprintf(summary_path,sizeof(summary_path),"%s/texture_gpu_summary.csv",dir);
  FILE *summary=fopen(summary_path,"wb");
+ int summary_ok=summary!=NULL;
  if(summary)fprintf(summary,"format,frames,over_16667us,max_total_us,mean_total_us,mean_texture_write_us,mean_submit_us,mean_present_us,texture_bytes\n");
  for(int mode=0;mode<3;mode++){
   unsigned over=0,max_total=0;
@@ -4022,11 +4023,14 @@ static void v6_gpu_texture_workload(){
   /* Explicitly distinguish unsupported bindings from a zero-time result. */
   fprintf(summary,"BC1_DXT1,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
   fprintf(summary,"BC3_DXT5,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
-  fclose(summary);
+  if(ferror(summary))summary_ok=0;
+  if(fclose(summary)!=0)summary_ok=0;
  }
  fprintf(f,"BC1_DXT1,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fprintf(f,"BC3_DXT5,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
- fclose(f);
+ int ok=!ferror(f);
+ if(fclose(f)!=0)ok=0;
+ return ok && summary_ok;
 }
 static void draw(){
  g_perf_draw_begin_us=fps_now_us();
@@ -4042,7 +4046,7 @@ static void draw(){
   if(!unattended_manifest_written){
    unattended_manifest_written=1;
    v6_texture_format_benchmark();
-   v6_gpu_texture_workload();
+   int gpu_benchmark_saved=v6_gpu_texture_workload();
    const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
    mkdir(dir,0777);
    char marker[256];snprintf(marker,sizeof(marker),"%s/automatic_run_complete.txt",dir);
@@ -4053,6 +4057,7 @@ static void draw(){
     fprintf(mf,"Scenes: p15_shell_no_rows,p15_background_text,p15_icons_text,p15_combined_rows,p15_full_browser,p15_reference\n");
     fprintf(mf,"Frame budget: 16667 microseconds; see each scene summary for overruns.\n");
     fprintf(mf,"No controller input is required for testing or log capture.\n");
+    fprintf(mf,"GPU texture benchmark files saved: %s\n",gpu_benchmark_saved?"yes":"NO - check HDD / allocation");
     fclose(mf);
    }
   }
