@@ -3861,16 +3861,16 @@ static void v6_texture_format_benchmark(){
  u32 *src=(u32*)malloc(N*4u);
  u32 *dst=(u32*)malloc(N*4u);
  unsigned short *packed=(unsigned short*)malloc(N*2u);
- unsigned char *rle=(unsigned char*)malloc(N*5u);
+ unsigned char *rle=(unsigned char*)malloc(N*8u);
  if(!src||!dst||!packed||!rle){
-  fprintf(f,"error,allocation_failed\\n");fclose(f);
+  fprintf(f,"error,allocation_failed\n");fclose(f);
   free(src);free(dst);free(packed);free(rle);return;
  }
  for(unsigned i=0;i<N;i++){
   unsigned x=i%128u,y=i/128u;
   src[i]=0xFF000000u|((x*2u)<<16)|((y*2u)<<8)|((x^y)*2u);
  }
- fprintf(f,"format,bytes_per_texture,encode_total_us,decode_total_us,roundtrip_mismatched_pixels,iterations,notes\\n");
+ fprintf(f,"format,bytes_per_texture,encode_total_us,decode_total_us,roundtrip_mismatched_pixels,iterations,notes\n");
  for(unsigned fmt=0;fmt<4;fmt++){
   unsigned long long t0=fps_now_us(),t1,t2;
   unsigned mismatches=0,bytes=N*4u;
@@ -3907,20 +3907,20 @@ static void v6_texture_format_benchmark(){
    bytes=outn;t1=fps_now_us();
    for(int rep=0;rep<REPS;rep++){
     unsigned pos=0;
-    for(unsigned i=0;i<outn;i+=2){
-     unsigned run=rle[i];memset(((unsigned char*)dst)+pos,rle[i+1],run);pos+=run;
+    for(unsigned i=0;i+1<outn;i+=2){
+     unsigned run=rle[i];if(pos+run>N*4u){pos=N*4u;break;}memset(((unsigned char*)dst)+pos,rle[i+1],run);pos+=run;
     }
    }
    t2=fps_now_us();
   }
   for(unsigned i=0;i<N;i++)if(src[i]!=dst[i])mismatches++;
-  fprintf(f,"%s,%u,%llu,%llu,%u,%u,%s\\n",
+  fprintf(f,"%s,%u,%llu,%llu,%u,%u,%s\n",
    fmt==0?"RGBA8888":fmt==1?"RGB565":fmt==2?"ARGB1555":"RLE_lossless_CPU",
    bytes,(unsigned long long)(t1-t0),(unsigned long long)(t2-t1),
    mismatches,REPS,fmt==3?"CPU_reference_not_RSX_texture_format":"CPU_conversion_not_GPU_sampling");
  }
- fprintf(f,"BC1_DXT1,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\\n");
- fprintf(f,"BC3_DXT5,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\\n");
+ fprintf(f,"BC1_DXT1,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\n");
+ fprintf(f,"BC3_DXT5,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\n");
  fclose(f);free(src);free(dst);free(packed);free(rle);
 }
 static void draw(){
