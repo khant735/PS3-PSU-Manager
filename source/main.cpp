@@ -3981,6 +3981,48 @@ static void v6_dxt1_to_rgb565(const u8 *src,u16 *dst,unsigned w,unsigned h){
   }
  }
 }
+/* BC2/DXT3 and BC3/DXT5 share the BC1 four-colour endpoint block.
+   DXT4 uses BC3's layout but stores premultiplied RGB. Convert to straight
+   alpha before sending A8R8G8B8 to Tiny3D. Input blocks are little endian. */
+static unsigned v6_bc565_r(unsigned c){unsigned x=(c>>11)&31u;return (x<<3)|(x>>2);}
+static unsigned v6_bc565_g(unsigned c){unsigned x=(c>>5)&63u;return (x<<2)|(x>>4);}
+static unsigned v6_bc565_b(unsigned c){unsigned x=c&31u;return (x<<3)|(x>>2);}
+static void v6_bc2_bc3_to_argb(const u8 *blocks,u32 *dst,unsigned w,unsigned h,unsigned mode){
+ for(unsigned by=0;by<h;by+=4)for(unsigned bx=0;bx<w;bx+=4){
+  const u8 *q=blocks+(((by/4)*(w/4))+(bx/4))*16u;
+  unsigned c0=(unsigned)q[8]|((unsigned)q[9]<<8);
+  unsigned c1=(unsigned)q[10]|((unsigned)q[11]<<8);
+  unsigned r[4],g[4],b[4];
+  r[0]=v6_bc565_r(c0);g[0]=v6_bc565_g(c0);b[0]=v6_bc565_b(c0);
+  r[1]=v6_bc565_r(c1);g[1]=v6_bc565_g(c1);b[1]=v6_bc565_b(c1);
+  for(unsigned k=0;k<3;k++){
+   unsigned *p=k==0?r:k==1?g:b;
+   p[2]=(2*p[0]+p[1])/3;p[3]=(p[0]+2*p[1])/3;
+  }
+  unsigned a[8]={0};
+  if(mode!=3){
+   a[0]=q[0];a[1]=q[1];
+   if(a[0]>a[1]){
+    for(unsigned k=1;k<=6;k++)a[k+1]=((7-k)*a[0]+k*a[1])/7;
+   }else{
+    for(unsigned k=1;k<=4;k++)a[k+1]=((5-k)*a[0]+k*a[1])/5;
+    a[6]=0;a[7]=255;
+   }
+  }
+  unsigned idx=(unsigned)q[12]|((unsigned)q[13]<<8)|((unsigned)q[14]<<16)|((unsigned)q[15]<<24);
+  unsigned long long abits=0;
+  if(mode!=3)for(unsigned k=0;k<6;k++)abits|=((unsigned long long)q[2+k])<<(8*k);
+  for(unsigned iy=0;iy<4;iy++)for(unsigned ix=0;ix<4;ix++){
+   unsigned k=iy*4+ix,ci=(idx>>(2*k))&3u;
+   unsigned alpha=mode==3?((k&1)?(q[k/2]>>4):(q[k/2]&15u))*17u:a[(abits>>(3*k))&7u];
+   unsigned rr=r[ci],gg=g[ci],bb=b[ci];
+   if(mode==4 && alpha){rr=rr*255u/alpha;gg=gg*255u/alpha;bb=bb*255u/alpha;
+    if(rr>255)rr=255;if(gg>255)gg=255;if(bb>255)bb=255;}
+   if(mode==4 && !alpha)rr=gg=bb=0;
+   dst[(by+iy)*w+bx+ix]=(alpha<<24)|(rr<<16)|(gg<<8)|bb;
+  }
+ }
+}
 static int v6_gpu_texture_workload(){
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
@@ -3989,7 +4031,7 @@ static int v6_gpu_texture_workload(){
  enum {W=128,H=128,COUNT=24};
  u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
  u16 *packed=(u16*)tiny3d_AllocTexture(W*H*2);
- u8 *dxt1=(u8*)malloc((W/4)*(H/4)*8u);
+ u8 *dxt1=(u8*)malloc((W/4)*(H/4)*16u);
  if(!pixels||!packed||!dxt1){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");free(dxt1);fclose(f);return 0;}
  const u32 rgba_off=tiny3d_TextureOffset(pixels);
  const u32 packed_off=tiny3d_TextureOffset(packed);
@@ -4000,7 +4042,7 @@ static int v6_gpu_texture_workload(){
  FILE *summary=fopen(summary_path,"wb");
  int summary_ok=summary!=NULL;
  if(summary)fprintf(summary,"format,frames,over_16667us,max_total_us,mean_total_us,mean_texture_write_us,mean_submit_us,mean_present_us,texture_bytes\n");
- for(int mode=0;mode<4;mode++){
+ for(int mode=0;mode<7;mode++){
   unsigned over=0,max_total=0;
   unsigned long long total_sum=0,write_sum=0,submit_sum=0,present_sum=0;
   for(int rep=0;rep<COUNT;rep++){
@@ -4015,6 +4057,18 @@ static int v6_gpu_texture_workload(){
      q[4]=(u8)(0xE4u+rep);q[5]=0x1Bu;q[6]=0xE4u;q[7]=0x1Bu;
     }
     v6_dxt1_to_rgb565(dxt1,packed,W,H);
+   }else if(mode>=4){
+    /* Synthetic DXT3/DXT4/DXT5 blocks. BC3 endpoints 255,0 and indexed
+       alpha exercise the interpolation path; DXT4's RGB is premultiplied. */
+    for(unsigned i=0;i<(W/4)*(H/4);i++){
+     u8 *q=dxt1+i*16u;
+     for(unsigned k=0;k<16;k++)q[k]=0;
+     if(mode==4){for(unsigned k=0;k<8;k++)q[k]=0xF8u;}
+     else {q[0]=255;q[1]=0;for(unsigned k=2;k<8;k++)q[k]=0x00u;}
+     q[8]=0x00;q[9]=0xF8;q[10]=0x00;q[11]=0x00;
+     q[12]=(u8)(0xE4u+rep);q[13]=0x1B;q[14]=0xE4;q[15]=0x1B;
+    }
+    v6_bc2_bc3_to_argb(dxt1,pixels,W,H,mode==4?3:mode==5?4:5);
    }else for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
     unsigned rr=x*2u,gg=y*2u,bb=(x^y)*2u;
     if(mode==0) pixels[y*W+x]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
@@ -4027,8 +4081,8 @@ static int v6_gpu_texture_workload(){
       on hardware before treating these timings as safe performance data. */
    tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
    tiny3d_Project2D();
-   tiny3d_SetTextureWrap(0,mode==0?rgba_off:packed_off,W,H,W*(mode==0?4:2),
-      mode==0?TINY3D_TEX_FORMAT_A8R8G8B8:
+   tiny3d_SetTextureWrap(0,mode==0||mode>=4?rgba_off:packed_off,W,H,W*(mode==0||mode>=4?4:2),
+      mode==0||mode>=4?TINY3D_TEX_FORMAT_A8R8G8B8:
       mode==1||mode==3?TINY3D_TEX_FORMAT_R5G6B5:TINY3D_TEX_FORMAT_A1R5G5B5,
       TEXTWRAP_CLAMP,TEXTWRAP_CLAMP,TEXTURE_LINEAR);
    tiny3d_SetPolygon(TINY3D_QUADS);
@@ -4046,27 +4100,31 @@ static int v6_gpu_texture_workload(){
    if(total_us>max_total)max_total=total_us;
    total_sum+=total_us;write_sum+=t1-t0;submit_sum+=t2-t1;present_sum+=t3-t2;
    fprintf(f,"%s,%s,%u,%d,%llu,%llu,%llu,%llu,%u,%s\n",
-     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"ARGB1555":"DXT1_decoded_RGB565",
-     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":"RGB565",
-     W*H*(mode==0?4:2),rep,(unsigned long long)(t1-t0),
+     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"ARGB1555":mode==3?"DXT1_decoded_RGB565":mode==4?"DXT3_decoded_RGBA8888":mode==5?"DXT4_decoded_RGBA8888":"DXT5_decoded_RGBA8888",
+     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":mode==3?"RGB565":"RGBA8888",
+     W*H*(mode==0||mode>=4?4:2),rep,(unsigned long long)(t1-t0),
      (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),
      (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL),
-     mode==3?"cpu_DXT1_decode_to_RGB565_then_native_binding":"native_texture_binding");
+     mode==3?"cpu_DXT1_decode_to_RGB565_then_native_binding":mode>=4?"cpu_DXT_decode_to_RGBA8888_then_native_binding":"native_texture_binding");
   }
   if(summary)fprintf(summary,"%s,%u,%u,%u,%llu,%llu,%llu,%llu,%u\n",
-    mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":"DXT1_decoded_RGB565",
+    mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":mode==3?"DXT1_decoded_RGB565":mode==4?"DXT3_decoded_RGBA8888":mode==5?"DXT4_decoded_RGBA8888":"DXT5_decoded_RGBA8888",
     COUNT,over,max_total,total_sum/COUNT,write_sum/COUNT,
-    submit_sum/COUNT,present_sum/COUNT,W*H*(mode==0?4:2));
+    submit_sum/COUNT,present_sum/COUNT,W*H*(mode==0||mode>=4?4:2));
  }
  if(summary){
   /* Explicitly distinguish unsupported bindings from a zero-time result. */
   fprintf(summary,"BC1_DXT1,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
+  fprintf(summary,"BC2_DXT3_native,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
+  fprintf(summary,"BC3_DXT4_native,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
   fprintf(summary,"BC3_DXT5,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
   if(ferror(summary))summary_ok=0;
   if(fclose(summary)!=0)summary_ok=0;
  }
  free(dxt1);
  fprintf(f,"BC1_DXT1,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
+ fprintf(f,"BC2_DXT3,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
+ fprintf(f,"BC3_DXT4,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fprintf(f,"BC3_DXT5,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  int ok=!ferror(f);
  if(fclose(f)!=0)ok=0;
