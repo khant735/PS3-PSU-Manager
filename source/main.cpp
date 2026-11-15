@@ -2827,7 +2827,7 @@ static void v6_save(){
    if(p->preview_active){active_icn_draws+=p->icn_draw_calls;active_icn_blits+=p->icn_blit_calls;}
    else {inactive_icn_draws+=p->icn_draw_calls;inactive_icn_blits+=p->icn_blit_calls;}
   }
-  fprintf(f,"ICN draw calls while inactive: %u\\nICN cache blits while inactive: %u\\nICN draw calls while active: %u\\nICN cache blits while active: %u\\n",
+  fprintf(f,"ICN draw calls while inactive: %u\nICN cache blits while inactive: %u\nICN draw calls while active: %u\nICN cache blits while active: %u\n",
     inactive_icn_draws,inactive_icn_blits,active_icn_draws,active_icn_blits);
   fprintf(f,"Active 3D ICN preview frames: %u\nInactive preview with valid model state: %u\nInactive preview with cached model: %u\n",
     active_preview_frames,inactive_preview_valid,inactive_preview_cache);
@@ -2848,6 +2848,51 @@ static void v6_save(){
   fprintf(f,"CSV written: %s\n",csv_ok?"yes":"no");
   fprintf(f,"Target FPS: %u\nMinor drop threshold: 0.1 FPS\nMajor drop threshold: 1.0 FPS\nMinor or major events: %u\nMajor events: %u\nEvent CSV frames: %u\nEvent CSV written: %s\n",target_fps,event_count,major_count,event_frames,event_ok?"yes":"no");
   txt_ok=!ferror(f);if(fclose(f)!=0)txt_ok=0;
+ }
+ /* One unattended cross-scene diagnostic report: calculated after capture,
+    never from the timed rendering loop. No performance changes are implied. */
+ {
+  static unsigned report_rows=0;
+  static struct {
+   unsigned scene,frames,over_budget,max_interval,upload_frames,upload_over,
+            inactive_draws,inactive_blits;
+   unsigned long long draw_total,flip_total,upload_bytes;
+  } report[6];
+  if(scene>=24&&scene<=29){
+   unsigned k=scene-24;
+   report[k].scene=scene;report[k].frames=v6_n>1?v6_n-1:0;
+   for(unsigned i=1;i<v6_n;i++){
+    const v6_row *p=&v6_rows[i];
+    report[k].draw_total+=p->draw;report[k].flip_total+=p->flip;
+    if(p->dt>16667u)++report[k].over_budget;
+    if(p->dt>report[k].max_interval)report[k].max_interval=p->dt;
+    if(p->uploads){
+     ++report[k].upload_frames;report[k].upload_bytes+=p->upload_bytes;
+     if(p->dt>16667u)++report[k].upload_over;
+    }
+    if(!p->preview_active){
+     report[k].inactive_draws+=p->icn_draw_calls;
+     report[k].inactive_blits+=p->icn_blit_calls;
+    }
+   }
+   report_rows|=1u<<k;
+  }
+  if(report_rows==63u){
+   char path[256];snprintf(path,sizeof(path),"%s/unattended_cross_scene_report.csv",dir);
+   FILE *out=fopen(path,"wb");
+   if(out){
+    fprintf(out,"scene,frames,frames_over_16667us,max_interval_us,mean_draw_us,mean_flip_us,upload_frames,upload_frames_over_budget,upload_bytes,inactive_icn_draws,inactive_icn_blits\\n");
+    for(unsigned k=0;k<6;k++){
+     const unsigned n=report[k].frames;
+     fprintf(out,"%u,%u,%u,%u,%llu,%llu,%u,%u,%llu,%u,%u\\n",
+      report[k].scene,n,report[k].over_budget,report[k].max_interval,
+      n?report[k].draw_total/n:0ULL,n?report[k].flip_total/n:0ULL,
+      report[k].upload_frames,report[k].upload_over,report[k].upload_bytes,
+      report[k].inactive_draws,report[k].inactive_blits);
+    }
+    fclose(out);
+   }
+  }
  }
  snprintf(status_line,sizeof(status_line),
     csv_ok&&txt_ok?"Stage 6V %s: 30s logs saved to HDD":
