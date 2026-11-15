@@ -3950,8 +3950,8 @@ static void v6_texture_format_benchmark(){
  fclose(f);free(src);free(dst);free(packed);free(rle);
 }
 /* Stage 6V GPU-side texture workload: one unattended session, after scene capture.
-   This measures real RSX upload/bind/draw/present with a supported RGBA8888
-   texture. Packed formats are CPU-expanded to RGBA and labelled accordingly;
+   This measures CPU texture writes and real RSX bind/draw/present with native
+   RGBA8888, RGB565 and A1R5G5B5 texture bindings;
    no unverified native DXT bindings are issued. */
 static void present();
 static void v6_gpu_texture_workload(){
@@ -3965,7 +3965,13 @@ static void v6_gpu_texture_workload(){
  if(!pixels||!packed){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
  const u32 rgba_off=tiny3d_TextureOffset(pixels);
  const u32 packed_off=tiny3d_TextureOffset(packed);
+ char summary_path[256];
+ snprintf(summary_path,sizeof(summary_path),"%s/texture_gpu_summary.csv",dir);
+ FILE *summary=fopen(summary_path,"wb");
+ if(summary)fprintf(summary,"format,frames,over_16667us,max_total_us,mean_total_us,mean_texture_write_us,mean_submit_us,mean_present_us,texture_bytes\n");
  for(int mode=0;mode<3;mode++){
+  unsigned over=0,max_total=0;
+  unsigned long long total_sum=0,write_sum=0,submit_sum=0,present_sum=0;
   for(int rep=0;rep<COUNT;rep++){
    unsigned long long t0=fps_now_us();
    for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
@@ -3991,6 +3997,10 @@ static void v6_gpu_texture_workload(){
    present();
    g_frame_counter++;
    unsigned long long t3=fps_now_us();
+   unsigned total_us=(unsigned)(t3-t0);
+   if(total_us>16667u)++over;
+   if(total_us>max_total)max_total=total_us;
+   total_sum+=total_us;write_sum+=t1-t0;submit_sum+=t2-t1;present_sum+=t3-t2;
    fprintf(f,"%s,%s,%u,%d,%llu,%llu,%llu,%llu,%u,native_texture_binding\n",
      mode==0?"RGBA8888":mode==1?"RGB565":"ARGB1555",
      mode==0?"RGBA8888":mode==1?"RGB565":"A1R5G5B5",
@@ -3998,7 +4008,12 @@ static void v6_gpu_texture_workload(){
      (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),
      (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL));
   }
+  if(summary)fprintf(summary,"%s,%u,%u,%u,%llu,%llu,%llu,%llu,%u\n",
+    mode==0?"RGBA8888":mode==1?"RGB565":"A1R5G5B5",
+    COUNT,over,max_total,total_sum/COUNT,write_sum/COUNT,
+    submit_sum/COUNT,present_sum/COUNT,W*H*(mode==0?4:2));
  }
+ if(summary){fprintf(summary,"BC1_DXT1,0,0,0,0,0,0,0,0\nBC3_DXT5,0,0,0,0,0,0,0,0\n");fclose(summary);}
  fprintf(f,"BC1_DXT1,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fprintf(f,"BC3_DXT5,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fclose(f);
