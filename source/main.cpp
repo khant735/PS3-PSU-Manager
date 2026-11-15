@@ -2855,8 +2855,12 @@ static void v6_save(){
   static unsigned report_rows=0;
   static struct {
    unsigned scene,frames,over_budget,max_interval,upload_frames,upload_over,
-            inactive_draws,inactive_blits;
-   unsigned long long draw_total,flip_total,upload_bytes;
+            inactive_draws,inactive_blits,over_33333,over_50000,over_100000,
+            flip_over_budget,draw_over_budget,fifo_pending_frames,
+            framebuffer_same,preview_active_frames,preview_valid_inactive;
+   unsigned long long draw_total,flip_total,upload_bytes,queue_total,
+                      waitcmd_total,poll_total,background_total,
+                      list_total,preview_total;
   } report[6];
   if(scene>=24&&scene<=29){
    unsigned k=scene-24;
@@ -2864,6 +2868,21 @@ static void v6_save(){
    for(unsigned i=1;i<v6_n;i++){
     const v6_row *p=&v6_rows[i];
     report[k].draw_total+=p->draw;report[k].flip_total+=p->flip;
+    report[k].queue_total+=p->queue_us;
+    report[k].waitcmd_total+=p->waitcmd_us;
+    report[k].poll_total+=p->poll_us;
+    report[k].background_total+=p->draw_bg_us;
+    report[k].list_total+=p->draw_list_us;
+    report[k].preview_total+=p->draw_preview_us;
+    if(p->dt>33333u)++report[k].over_33333;
+    if(p->dt>50000u)++report[k].over_50000;
+    if(p->dt>100000u)++report[k].over_100000;
+    if(p->flip>16667u)++report[k].flip_over_budget;
+    if(p->draw>16667u)++report[k].draw_over_budget;
+    if(p->pre_get!=p->pre_put)++report[k].fifo_pending_frames;
+    if(p->buffer_before==p->buffer_after)++report[k].framebuffer_same;
+    if(p->preview_active)++report[k].preview_active_frames;
+    if(!p->preview_active&&p->preview_valid)++report[k].preview_valid_inactive;
     if(p->dt>16667u)++report[k].over_budget;
     if(p->dt>report[k].max_interval)report[k].max_interval=p->dt;
     if(p->uploads){
@@ -2881,14 +2900,21 @@ static void v6_save(){
    char path[256];snprintf(path,sizeof(path),"%s/unattended_cross_scene_report.csv",dir);
    FILE *out=fopen(path,"wb");
    if(out){
-    fprintf(out,"scene,frames,frames_over_16667us,max_interval_us,mean_draw_us,mean_flip_us,upload_frames,upload_frames_over_budget,upload_bytes,inactive_icn_draws,inactive_icn_blits\\n");
+    fprintf(out,"scene,frames,frames_over_16667us,max_interval_us,mean_draw_us,mean_flip_us,upload_frames,upload_frames_over_budget,upload_bytes,inactive_icn_draws,inactive_icn_blits,frames_over_33333us,frames_over_50000us,frames_over_100000us,flip_over_16667us,draw_over_16667us,fifo_pending_at_flip,unchanged_framebuffer_index,preview_active_frames,preview_valid_while_inactive,mean_queue_us,mean_waitcmd_us,mean_poll_us,mean_background_us,mean_list_us,mean_preview_us\\n");
     for(unsigned k=0;k<6;k++){
      const unsigned n=report[k].frames;
-     fprintf(out,"%u,%u,%u,%u,%llu,%llu,%u,%u,%llu,%u,%u\\n",
+     fprintf(out,"%u,%u,%u,%u,%llu,%llu,%u,%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu\\n",
       report[k].scene,n,report[k].over_budget,report[k].max_interval,
       n?report[k].draw_total/n:0ULL,n?report[k].flip_total/n:0ULL,
       report[k].upload_frames,report[k].upload_over,report[k].upload_bytes,
-      report[k].inactive_draws,report[k].inactive_blits);
+      report[k].inactive_draws,report[k].inactive_blits,
+      report[k].over_33333,report[k].over_50000,report[k].over_100000,
+      report[k].flip_over_budget,report[k].draw_over_budget,
+      report[k].fifo_pending_frames,report[k].framebuffer_same,
+      report[k].preview_active_frames,report[k].preview_valid_inactive,
+      n?report[k].queue_total/n:0ULL,n?report[k].waitcmd_total/n:0ULL,
+      n?report[k].poll_total/n:0ULL,n?report[k].background_total/n:0ULL,
+      n?report[k].list_total/n:0ULL,n?report[k].preview_total/n:0ULL);
     }
     fclose(out);
    }
