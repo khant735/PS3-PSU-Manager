@@ -2739,6 +2739,36 @@ static void v6_save(){
   }
   csv_ok=!ferror(f);if(fclose(f)!=0)csv_ok=0;
  }
+
+ /* Phase 16: derive slowdown windows from existing frame samples, without
+    adding any work to the GPU presentation path. */
+ char event_path[256];
+ snprintf(event_path,sizeof(event_path),"%s/%s_events.csv",dir,base);
+ unsigned event_count=0,event_frames=0;int event_ok=0;
+ FILE *event_file=fopen(event_path,"wb");
+ if(event_file){
+  fprintf(event_file,"event_id,offset,frame,interval_us,fps,draw_us,flip_us,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after\n");
+  unsigned threshold=(scene==24||scene==26)?27778u:(scene==29?18519u:38462u);
+  unsigned last_end=0;
+  for(unsigned i=1;i<v6_n;i++){
+   if(v6_rows[i].dt<=threshold)continue;
+   unsigned begin=i>8?i-8:0,end=i+13<v6_n?i+13:v6_n;
+   if(event_count&&begin<last_end)begin=last_end;
+   if(begin>=end)continue;
+   ++event_count;
+   for(unsigned j=begin;j<end;j++){
+    const v6_row *p=&v6_rows[j];
+    fprintf(event_file,"%u,%d,%u,%u,%.3f,%u,%u,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u\n",
+      event_count,(int)j-(int)i,p->frame,p->dt,p->dt?1000000.0/p->dt:0.0,
+      p->draw,p->flip,p->vb,p->status,p->pre_get,p->pre_put,p->post_get,p->post_put,
+      p->poll_us,p->queue_us,p->waitcmd_us,p->tail_us,p->polls,p->callbacks,
+      p->buffer_before,p->buffer_after);
+    ++event_frames;
+   }
+   last_end=end;
+  }
+  event_ok=!ferror(event_file);if(fclose(event_file)!=0)event_ok=0;
+ }
  f=fopen(txt,"wb");
  if(f){
   fprintf(f,"Stage 6V %s - 30 seconds\n",base);
@@ -2764,6 +2794,7 @@ static void v6_save(){
    startup_frames?start_draw/1000.0/startup_frames:0.0,
    startup_frames?start_flip/1000.0/startup_frames:0.0,start_stalls);
   fprintf(f,"CSV written: %s\n",csv_ok?"yes":"no");
+  fprintf(f,"Slowdown event windows: %u\nEvent frames: %u\nEvent CSV written: %s\n",event_count,event_frames,event_ok?"yes":"no");
   txt_ok=!ferror(f);if(fclose(f)!=0)txt_ok=0;
  }
  snprintf(status_line,sizeof(status_line),
