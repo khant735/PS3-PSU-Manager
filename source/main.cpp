@@ -3958,7 +3958,7 @@ static void v6_gpu_texture_workload(){
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
  FILE *f=fopen(path,"wb");if(!f)return;
- fprintf(f,"source_format,gpu_binding,texture_bytes,frame,upload_cpu_us,submit_cpu_us,present_wall_us,total_wall_us,over_16667us,status\n");
+ fprintf(f,"source_format,gpu_binding,texture_bytes,frame,texture_write_cpu_us,submit_cpu_us,present_wall_us,total_wall_us,over_16667us,status\n");
  enum {W=128,H=128,COUNT=24};
  u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
  if(!pixels){fprintf(f,"RGBA8888,RGBA8888,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
@@ -3985,6 +3985,7 @@ static void v6_gpu_texture_workload(){
    tiny3d_End();
    unsigned long long t2=fps_now_us();
    present();
+   g_frame_counter++;
    unsigned long long t3=fps_now_us();
    fprintf(f,"%s,RGBA8888,%u,%d,%llu,%llu,%llu,%llu,%u,measured_native_RGBA_binding\n",
      mode==0?"RGBA8888":mode==1?"RGB565_expanded": "ARGB1555_expanded",
