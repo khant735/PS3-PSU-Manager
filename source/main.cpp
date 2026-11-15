@@ -4023,6 +4023,65 @@ static void v6_bc2_bc3_to_argb(const u8 *blocks,u32 *dst,unsigned w,unsigned h,u
   }
  }
 }
+/* Unattended font workload. Tests the production RSX atlas path at two
+   flush granularities and a legacy glyph-expansion CPU reference. The CPU
+   reference deliberately does NOT claim a GPU-equivalent rendered frame. */
+static int v6_font_render_workload(){
+ const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
+ char path[256];snprintf(path,sizeof(path),"%s/font_render_workload.csv",dir);
+ FILE *f=fopen(path,"wb");if(!f)return 0;
+ fprintf(f,"mode,frame,glyph_count,text_commands,text_flushes,atlas_bytes,cpu_prepare_us,submit_us,present_us,frame_interval_us,over_16667us,status\n");
+ const char *lines[]={
+  "PS3 PSU MANAGER - MAIN MENU / FILE BROWSER",
+  "ICON.SYS DETAILS  PS2 SAVE DATA  REGION",
+  "MEMORY CARD 1   MEMORY CARD 2   SETTINGS",
+  "FILE NAME  GAME TITLE  DATE  SIZE  FORMAT",
+  "RENAME  DOWNLOAD  EXTRACT  DELETE  CANCEL",
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+  "STATUS: READY   FPS: 60.00   RSX: ACTIVE",
+  "PS2 3D ICON PREVIEW   FILE BROWSER ROWS"
+ };
+ const unsigned line_count=sizeof(lines)/sizeof(lines[0]);
+ const int repeats=24;
+ volatile unsigned legacy_pixels=0;
+ for(int mode=0;mode<3;mode++)for(int rep=0;rep<repeats;rep++){
+  unsigned long long t0=fps_now_us();
+  unsigned glyphs=0,commands=0,flushes=0;
+  g_perf_draw_begin_us=t0;
+  if(mode==2){
+   /* Legacy 5x7 per-pixel work, CPU-only, no framebuffer writes. */
+   for(unsigned row=0;row<line_count;row++)for(const char *p=lines[row];*p;p++){
+    glyphs++;const u8 *g=glyph(*p);
+    for(int yy=0;yy<7;yy++)for(int xx=0;xx<5;xx++)
+     if(g[yy]&(1<<(4-xx)))legacy_pixels++;
+   }
+  }
+  unsigned long long t1=fps_now_us();
+  tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+  tiny3d_Project2D();
+  if(mode!=2){
+   for(unsigned row=0;row<line_count;row++){
+    glyphs+=(unsigned)strlen(lines[row]);commands++;
+    rsx_ui_text_raw(28,24+(int)row*48,lines[row],0xFFFFFFFFu,2);
+    if(mode==1){rsx_flush_text_batch();flushes++;}
+   }
+   if(mode==0){rsx_flush_text_batch();flushes++;}
+  }
+  unsigned long long t2=fps_now_us();
+  present();g_frame_counter++;
+  unsigned long long t3=fps_now_us();
+  fprintf(f,"%s,%d,%u,%u,%u,%u,%llu,%llu,%llu,%llu,%u,%s\n",
+   mode==0?"atlas_batched":mode==1?"atlas_forced_flush":"legacy_glyph_CPU_only",
+   rep,glyphs,commands,flushes,RSX_FONT_ATLAS_W*RSX_FONT_ATLAS_H*4,
+   (unsigned long long)(t1-t0),(unsigned long long)(t2-t1),
+   (unsigned long long)(t3-t2),(unsigned long long)(t3-t0),
+   (unsigned)(t3-t0>16667ULL),
+   mode==2?"CPU_reference_not_GPU_equivalent":"RSX_atlas_rendered");
+ }
+ int ok=!ferror(f);if(fclose(f)!=0)ok=0;
+ (void)legacy_pixels;
+ return ok;
+}
 static int v6_gpu_texture_workload(){
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
@@ -4145,6 +4204,7 @@ static void draw(){
    unattended_manifest_written=1;
    v6_texture_format_benchmark();
    int gpu_benchmark_saved=v6_gpu_texture_workload();
+   int font_benchmark_saved=v6_font_render_workload();
    const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
    mkdir(dir,0777);
    char marker[256];snprintf(marker,sizeof(marker),"%s/automatic_run_complete.txt",dir);
@@ -4156,6 +4216,7 @@ static void draw(){
     fprintf(mf,"Frame budget: 16667 microseconds; see each scene summary for overruns.\n");
     fprintf(mf,"No controller input is required for testing or log capture.\n");
     fprintf(mf,"GPU texture benchmark files saved: %s\n",gpu_benchmark_saved?"yes":"NO - check HDD / allocation");
+    fprintf(mf,"Font renderer benchmark file saved: %s\n",font_benchmark_saved?"yes":"NO - check HDD");
     fclose(mf);
    }
   }
