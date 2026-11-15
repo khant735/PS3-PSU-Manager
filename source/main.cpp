@@ -433,6 +433,11 @@ extern "C" u32 __wrap_gcmGetFlipStatus(void){
  if(g_4x_probe_active){
   if(!g_4x_first_status_us){g_4x_first_status_us=t;g_5k_poll_first=st;g_5k_poll_first_us=t;g_5l_vb_next_entry=gcmGetVBlankCount();g_5l_seen_first_poll=1;g_5n_disp_n=phase5n_display_id();}
   if(st==0 && !g_5l_vb_zero){g_5l_vb_zero=gcmGetVBlankCount();g_5n_disp_z=phase5n_display_id();}
+  if(g_4x_status_polls==0){g_16_first_status=st;g_16_last_status=st;}
+  else if(st!=g_16_last_status){
+   if(!g_16_status_changes)g_16_first_change_us=t;
+   g_16_last_change_us=t;++g_16_status_changes;g_16_last_status=st;
+  }
   g_4x_status_polls++; g_5k_poll_last=st; g_5k_poll_last_us=t;
   if(st!=0)g_5k_poll_nonzero++;
  }
@@ -2658,6 +2663,9 @@ static void update_fps_counter(){
 /* Stage 6V Phase 2: passive, in-memory stall observations. No GPU calls,
    allocations, filesystem writes or changes to the flip path. */
 static volatile u32 g_6v_long_flip_count=0;
+/* Phase 16.2: record status transitions during existing flip-status polling. */
+static volatile u32 g_16_status_changes=0,g_16_first_status=0,g_16_last_status=0;
+static volatile unsigned long long g_16_first_change_us=0,g_16_last_change_us=0;
 static volatile u32 g_6v_max_flip_us=0;
 static volatile u32 g_6v_last_get=0,g_6v_last_put=0;
 
@@ -2668,7 +2676,7 @@ static unsigned long long v6_static_start_us=0;
 static void v6_note_upload(u32 bytes){++v6_uploads;v6_upload_bytes+=bytes;}
 /* Stage 6V 30s dual capture: frame sampling is RAM-only; save after window. */
 #define V6_MAX 4096
-typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;} v6_row;
+typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;u32 status_changes,status_first,status_last,first_change_offset_us,last_change_offset_us;} v6_row;
 static v6_row v6_rows[V6_MAX];
 static unsigned v6_n=0,v6_active=0,v6_pending=0,v6_done=0,v6_overflow=0;
 static unsigned long long v6_begin=0,v6_prev=0;
@@ -2705,6 +2713,9 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
   p->tail_us=(g_4x_waitcmd_end_us&&now>=g_4x_waitcmd_end_us)?(u32)(now-g_4x_waitcmd_end_us):0;
   p->polls=g_4x_status_polls;p->callbacks=g_5b_cb_count;
   p->buffer_before=v6_buffer_before;p->buffer_after=v6_buffer_after;
+  p->status_changes=g_16_status_changes;p->status_first=g_16_first_status;p->status_last=g_16_last_status;
+  p->first_change_offset_us=(g_16_first_change_us>=g_4x_flip_enter_us)?(u32)(g_16_first_change_us-g_4x_flip_enter_us):0;
+  p->last_change_offset_us=(g_16_last_change_us>=g_4x_flip_enter_us)?(u32)(g_16_last_change_us-g_4x_flip_enter_us):0;
   p->draw_bg_us=(u32)(g_perf_bg_ms*1000.0f);p->draw_list_us=(u32)(g_perf_list_ms*1000.0f);p->draw_preview_us=(u32)(g_perf_preview_ms*1000.0f);p->uploads=v6_uploads;p->upload_bytes=v6_upload_bytes;
  }else ++v6_overflow;
  v6_prev=now;
@@ -2751,7 +2762,7 @@ static void v6_save(){
  const unsigned major_threshold=(unsigned)(1000000ULL/(target_fps-1u));
  FILE *event_file=fopen(event_path,"wb");
  if(event_file){
-  fprintf(event_file,"frame_index,frame,interval_us,instant_fps,drop_class,within_event_window,draw_us,flip_us,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after,texture_uploads,texture_upload_bytes\n");
+  fprintf(event_file,"frame_index,frame,interval_us,instant_fps,drop_class,within_event_window,draw_us,flip_us,vblank_delta,flip_status,pre_get,pre_put,post_get,post_put,poll_us,queue_us,waitcmd_us,tail_us,status_polls,callbacks,buffer_before,buffer_after,texture_uploads,texture_upload_bytes,status_changes,status_first,status_last,first_change_offset_us,last_change_offset_us\n");
   for(unsigned i=1;i<v6_n;i++){
    const v6_row *p=&v6_rows[i];
    int cls=p->dt>major_threshold?2:(p->dt>minor_threshold?1:0);
@@ -2761,11 +2772,11 @@ static void v6_save(){
    if(!nearby)for(unsigned j=first;j<=last;j++){
     if(v6_rows[j].dt>minor_threshold){nearby=1;break;}
    }
-   fprintf(event_file,"%u,%u,%u,%.4f,%d,%d,%u,%u,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+   fprintf(event_file,"%u,%u,%u,%.4f,%d,%d,%u,%u,%u,%u,%08X,%08X,%08X,%08X,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
     i,p->frame,p->dt,p->dt?1000000.0/p->dt:0.0,cls,nearby,
     p->draw,p->flip,p->vb,p->status,p->pre_get,p->pre_put,p->post_get,p->post_put,
     p->poll_us,p->queue_us,p->waitcmd_us,p->tail_us,p->polls,p->callbacks,
-    p->buffer_before,p->buffer_after,p->uploads,p->upload_bytes);
+    p->buffer_before,p->buffer_after,p->uploads,p->upload_bytes,p->status_changes,p->status_first,p->status_last,p->first_change_offset_us,p->last_change_offset_us);
    ++event_frames;
   }
   event_ok=!ferror(event_file);if(fclose(event_file)!=0)event_ok=0;
@@ -2825,6 +2836,7 @@ static void present(){
  v6_buffer_before=(u32)Video_currentBuffer;
  g_4x_flip_enter_us=before_flip; g_4x_first_status_us=0; g_4x_reset_us=0;
  g_4x_queue_begin_us=0; g_4x_queue_end_us=0; g_4x_waitcmd_begin_us=0; g_4x_waitcmd_end_us=0;
+ g_16_status_changes=0;g_16_first_status=g_16_last_status=0;g_16_first_change_us=g_16_last_change_us=0;
  g_4x_status_polls=0; g_5k_poll_nonzero=0;g_5k_poll_first=g_5k_poll_last=0;g_5k_poll_first_us=g_5k_poll_last_us=0;g_5l_vb_queue=g_5l_vb_waitcmd=g_5l_vb_next_entry=g_5l_vb_zero=0;g_5l_seen_first_poll=0;g_5n_disp_n=g_5n_disp_z=0xFF; g_4y_space_begin_us=g_4y_space_end_us=g_4y_target_begin_us=g_4y_target_end_us=g_4y_cb_begin_us=g_4y_cb_end_us=0;
  g_5a_space_count=0; for(int si=0;si<8;si++){g_5a_space_beg[si]=g_5a_space_end[si]=0;g_5a_space_bytes[si]=0;g_5e_space_off_beg[si]=g_5e_space_off_end[si]=0;} g_5e_between_bytes=g_5e_s1_inside_bytes=g_5e_s2_inside_bytes=0; g_5f_target_off0=g_5f_target_off1=g_5f_callback_off0=g_5f_callback_off1=0;g_5f_post_s1_to_target=g_5f_target_bytes=g_5f_callback_bytes=g_5f_after_callback_bytes=0; g_5b_cb_count=0;g_5b_cb_us=0;g_5b_get0=g_5b_put0=g_5b_get1=g_5b_put1=0;g_5b_cur_off0=g_5b_cur_off1=g_5b_linear_free0=g_5b_linear_free1=0;g_5b_cb_arg=0; g_4x_probe_active=1;
  tiny3d_Flip();
