@@ -150,27 +150,27 @@ jobs:
           else
             echo 'No curated supplemental dates supplied; using GameDB-PS2 baseline'
           fi
-      - name: Verify Phase 14 row isolation wiring
+      - name: Verify Phase 15 row isolation wiring
         run: |
           python3 - <<'PY'
           from pathlib import Path
           src=Path('source/main.cpp').read_text()
-          for token in ['p14_row_backgrounds', 'p14_row_icons',
-                        'p14_row_text', 'p14_rows_combined',
-                        'p14_full_browser', 'p14_reference',
-                        'p11_browser==24 || p11_browser==27',
+          for token in ['p15_shell_no_rows', 'p15_background_text',
+                        'p15_icons_text', 'p15_combined_rows',
+                        'p15_full_browser', 'p15_reference',
                         'p11_browser==25 || p11_browser==27',
                         'p11_browser==26 || p11_browser==27',
+                        'p11_browser>=25 && p11_browser<=28',
                         'p11_browser>=24 && p11_browser<=27']:
-              assert token in src, f'Missing Phase 14 token: {token}'
+              assert token in src, f'Missing Phase 15 token: {token}'
           # Source-level guard: escaped newline tokens accidentally inserted
-          # into C++ control-flow previously broke the Phase 14 compile.
+          # into C++ control-flow previously broke the Phase 15 compile.
           rows=src.split('selected=-1; /* render stable unselected rows once; selection becomes an overlay */',1)[1].split('selected=saved_selected_for_cache;',1)[0]
-          assert '\\n' not in rows, 'Literal backslash-n sequence in Phase 14 row renderer'
+          assert '\\n' not in rows, 'Literal backslash-n sequence in Phase 15 row renderer'
           # Browser-local phase identifier must not leak into the fast-list helper.
           fast=src.split('static int draw_fast_list_update()',1)[1].split('static void draw(){',1)[0]
           assert 'p11_browser' not in fast, 'Browser phase identifier escaped into fast-list renderer'
-          print('Phase 14 row isolation checks passed')
+          print('Phase 15 row isolation checks passed')
           PY
       - name: Build ELF SELF PKG
         env:
@@ -199,5 +199,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$(git rev-parse HEAD)" \
             --title "Stage 6V Phase 2 diagnostic run ${GITHUB_RUN_NUMBER}" \
-            --notes "Phase 14 six-scene 30-second browser row isolation: backgrounds, icons, text, combined rows, full UI and reference. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
+            --notes "Phase 15 six-scene 30-second browser row interaction isolation: shell, background+text, icons+text, combined rows, full UI and reference. Experimental test only; completion screen remains visible. Built from stage6v-phase2-observation-only." \
             --prerelease
