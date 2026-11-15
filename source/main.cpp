@@ -3990,7 +3990,7 @@ static int v6_gpu_texture_workload(){
  u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
  u16 *packed=(u16*)tiny3d_AllocTexture(W*H*2);
  u8 *dxt1=(u8*)malloc((W/4)*(H/4)*8u);
- if(!pixels||!packed||!dxt1){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return 0;}
+ if(!pixels||!packed||!dxt1){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");free(dxt1);fclose(f);return 0;}
  const u32 rgba_off=tiny3d_TextureOffset(pixels);
  const u32 packed_off=tiny3d_TextureOffset(packed);
  /* A single native-format buffer is reused sequentially. Record the exact
@@ -4022,8 +4022,9 @@ static int v6_gpu_texture_workload(){
     else packed[y*W+x]=(u16)(0x8000u|((rr>>3)<<10)|((gg>>3)<<5)|(bb>>3));
    }
    unsigned long long t1=fps_now_us();
-   /* End any previous texture consumers before overwriting the same RSX
-      allocation. tiny3d_Flip() has returned from the preceding iteration. */
+   /* Texture memory is reused between frames. A completed CPU-side flip
+      call alone is not proof of GPU read completion; verify synchronization
+      on hardware before treating these timings as safe performance data. */
    tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
    tiny3d_Project2D();
    tiny3d_SetTextureWrap(0,mode==0?rgba_off:packed_off,W,H,W*(mode==0?4:2),
