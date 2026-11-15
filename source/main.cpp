@@ -3949,6 +3949,53 @@ static void v6_texture_format_benchmark(){
  fprintf(f,"BC3_DXT5,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\n");
  fclose(f);free(src);free(dst);free(packed);free(rle);
 }
+/* Stage 6V GPU-side texture workload: one unattended session, after scene capture.
+   This measures real RSX upload/bind/draw/present with a supported RGBA8888
+   texture. Packed formats are CPU-expanded to RGBA and labelled accordingly;
+   no unverified native DXT bindings are issued. */
+static void v6_gpu_texture_workload(){
+ const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
+ char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
+ FILE *f=fopen(path,"wb");if(!f)return;
+ fprintf(f,"source_format,gpu_binding,texture_bytes,frame,upload_cpu_us,submit_cpu_us,present_wall_us,total_wall_us,over_16667us,status\n");
+ enum {W=128,H=128,COUNT=24};
+ u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
+ if(!pixels){fprintf(f,"RGBA8888,RGBA8888,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
+ const u32 off=tiny3d_TextureOffset(pixels);
+ for(int mode=0;mode<3;mode++){
+  for(int rep=0;rep<COUNT;rep++){
+   unsigned long long t0=fps_now_us();
+   for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
+    unsigned rr=x*2u,gg=y*2u,bb=(x^y)*2u;
+    if(mode==1){rr=(rr&248u)|(rr>>5);gg=(gg&252u)|(gg>>6);bb=(bb&248u)|(bb>>5);}
+    if(mode==2){rr=(rr&248u)|(rr>>5);gg=(gg&248u)|(gg>>5);bb=(bb&248u)|(bb>>5);}
+    pixels[y*W+x]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
+   }
+   unsigned long long t1=fps_now_us();
+   tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
+   tiny3d_Project2D();
+   tiny3d_SetTextureWrap(0,off,W,H,W*4,TINY3D_TEX_FORMAT_A8R8G8B8,
+      TEXTWRAP_CLAMP,TEXTWRAP_CLAMP,TEXTURE_LINEAR);
+   tiny3d_SetPolygon(TINY3D_QUADS);
+   tiny3d_VertexPos(120,80,0);tiny3d_VertexColor(0xFFFFFFFFu);tiny3d_VertexTexture(0,0);
+   tiny3d_VertexPos(728,80,0);tiny3d_VertexTexture(1,0);
+   tiny3d_VertexPos(728,432,0);tiny3d_VertexTexture(1,1);
+   tiny3d_VertexPos(120,432,0);tiny3d_VertexTexture(0,1);
+   tiny3d_End();
+   unsigned long long t2=fps_now_us();
+   present();
+   unsigned long long t3=fps_now_us();
+   fprintf(f,"%s,RGBA8888,%u,%d,%llu,%llu,%llu,%llu,%u,measured_native_RGBA_binding\n",
+     mode==0?"RGBA8888":mode==1?"RGB565_expanded": "ARGB1555_expanded",
+     W*H*4,rep,(unsigned long long)(t1-t0),
+     (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),
+     (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL));
+  }
+ }
+ fprintf(f,"BC1_DXT1,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
+ fprintf(f,"BC3_DXT5,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
+ fclose(f);
+}
 static void draw(){
  g_perf_draw_begin_us=fps_now_us();
  v6_uploads=0;v6_upload_bytes=0;v6_icn_draw_calls=0;v6_icn_blit_calls=0;
@@ -3963,6 +4010,7 @@ static void draw(){
   if(!unattended_manifest_written){
    unattended_manifest_written=1;
    v6_texture_format_benchmark();
+   v6_gpu_texture_workload();
    const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
    mkdir(dir,0777);
    char marker[256];snprintf(marker,sizeof(marker),"%s/automatic_run_complete.txt",dir);
