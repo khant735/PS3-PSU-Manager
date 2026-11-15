@@ -2900,10 +2900,10 @@ static void v6_save(){
    char path[256];snprintf(path,sizeof(path),"%s/unattended_cross_scene_report.csv",dir);
    FILE *out=fopen(path,"wb");
    if(out){
-    fprintf(out,"scene,frames,frames_over_16667us,max_interval_us,mean_draw_us,mean_flip_us,upload_frames,upload_frames_over_budget,upload_bytes,inactive_icn_draws,inactive_icn_blits,frames_over_33333us,frames_over_50000us,frames_over_100000us,flip_over_16667us,draw_over_16667us,fifo_pending_at_flip,unchanged_framebuffer_index,preview_active_frames,preview_valid_while_inactive,mean_queue_us,mean_waitcmd_us,mean_poll_us,mean_background_us,mean_list_us,mean_preview_us\\n");
+    fprintf(out,"scene,frames,frames_over_16667us,max_interval_us,mean_draw_us,mean_flip_us,upload_frames,upload_frames_over_budget,upload_bytes,inactive_icn_draws,inactive_icn_blits,frames_over_33333us,frames_over_50000us,frames_over_100000us,flip_over_16667us,draw_over_16667us,fifo_pending_at_flip,unchanged_framebuffer_index,preview_active_frames,preview_valid_while_inactive,mean_queue_us,mean_waitcmd_us,mean_poll_us,mean_background_us,mean_list_us,mean_preview_us\n");
     for(unsigned k=0;k<6;k++){
      const unsigned n=report[k].frames;
-     fprintf(out,"%u,%u,%u,%u,%llu,%llu,%u,%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu\\n",
+     fprintf(out,"%u,%u,%u,%u,%llu,%llu,%u,%u,%llu,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%llu,%llu,%llu,%llu,%llu,%llu\n",
       report[k].scene,n,report[k].over_budget,report[k].max_interval,
       n?report[k].draw_total/n:0ULL,n?report[k].flip_total/n:0ULL,
       report[k].upload_frames,report[k].upload_over,report[k].upload_bytes,
