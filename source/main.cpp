@@ -3954,6 +3954,33 @@ static void v6_texture_format_benchmark(){
    RGBA8888, RGB565 and A1R5G5B5 texture bindings;
    no unverified native DXT bindings are issued. */
 static void present();
+/* DXT1 colour-block decoder for the reVC-compatible fallback benchmark.
+   DXT1 8-byte blocks are expanded on CPU into native RGB565: this is
+   deliberately NOT a claim that the RSX samples DXT1 block-compressed data.
+   Colour endpoints and index bits in a standard DXT1 block are little endian. */
+static void v6_dxt1_to_rgb565(const u8 *src,u16 *dst,unsigned w,unsigned h){
+ for(unsigned by=0;by<h;by+=4)for(unsigned bx=0;bx<w;bx+=4){
+  const u8 *b=src+(((by/4)*(w/4))+(bx/4))*8u;
+  unsigned c0=(unsigned)b[0]|((unsigned)b[1]<<8);
+  unsigned c1=(unsigned)b[2]|((unsigned)b[3]<<8);
+  unsigned idx=(unsigned)b[4]|((unsigned)b[5]<<8)|((unsigned)b[6]<<16)|((unsigned)b[7]<<24);
+  unsigned r0=(c0>>11)&31u,g0=(c0>>5)&63u,b0=c0&31u;
+  unsigned r1=(c1>>11)&31u,g1=(c1>>5)&63u,b1=c1&31u;
+  unsigned pal[4]={c0,c1,0,0};
+  if(c0>c1){
+   pal[2]=(((2*r0+r1)/3)<<11)|(((2*g0+g1)/3)<<5)|((2*b0+b1)/3);
+   pal[3]=(((r0+2*r1)/3)<<11)|(((g0+2*g1)/3)<<5)|((b0+2*b1)/3);
+  }else{
+   pal[2]=(((r0+r1)/2)<<11)|(((g0+g1)/2)<<5)|((b0+b1)/2);
+   /* Transparent DXT1 texels require A1R5G5B5, not RGB565.
+      The generated benchmark blocks always select c0>c1. */
+   pal[3]=0;
+  }
+  for(unsigned iy=0;iy<4;iy++)for(unsigned ix=0;ix<4;ix++){
+   dst[(by+iy)*w+bx+ix]=(u16)pal[idx&3u];idx>>=2;
+  }
+ }
+}
 static int v6_gpu_texture_workload(){
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
@@ -3962,7 +3989,8 @@ static int v6_gpu_texture_workload(){
  enum {W=128,H=128,COUNT=24};
  u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
  u16 *packed=(u16*)tiny3d_AllocTexture(W*H*2);
- if(!pixels||!packed){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return 0;}
+ u8 *dxt1=(u8*)malloc((W/4)*(H/4)*8u);
+ if(!pixels||!packed||!dxt1){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return 0;}
  const u32 rgba_off=tiny3d_TextureOffset(pixels);
  const u32 packed_off=tiny3d_TextureOffset(packed);
  /* A single native-format buffer is reused sequentially. Record the exact
@@ -3972,13 +4000,22 @@ static int v6_gpu_texture_workload(){
  FILE *summary=fopen(summary_path,"wb");
  int summary_ok=summary!=NULL;
  if(summary)fprintf(summary,"format,frames,over_16667us,max_total_us,mean_total_us,mean_texture_write_us,mean_submit_us,mean_present_us,texture_bytes\n");
- for(int mode=0;mode<3;mode++){
+ for(int mode=0;mode<4;mode++){
   unsigned over=0,max_total=0;
   unsigned long long total_sum=0,write_sum=0,submit_sum=0,present_sum=0;
   for(int rep=0;rep<COUNT;rep++){
    unsigned long long t0=fps_now_us();
    g_perf_draw_begin_us=t0;
-   for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
+   if(mode==3){
+    /* Fixed opaque BC1 blocks with alternating 565 endpoints. Each frame
+       measures block generation + decompression into native 565 RSX storage. */
+    for(unsigned i=0;i<(W/4)*(H/4);i++){
+     u8 *q=dxt1+i*8u;
+     q[0]=0xFF;q[1]=0xFF;q[2]=0;q[3]=0;
+     q[4]=(u8)(0xE4u+rep);q[5]=0x1Bu;q[6]=0xE4u;q[7]=0x1Bu;
+    }
+    v6_dxt1_to_rgb565(dxt1,packed,W,H);
+   }else for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
     unsigned rr=x*2u,gg=y*2u,bb=(x^y)*2u;
     if(mode==0) pixels[y*W+x]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
     else if(mode==1) packed[y*W+x]=(u16)(((rr>>3)<<11)|((gg>>2)<<5)|(bb>>3));
@@ -3991,7 +4028,7 @@ static int v6_gpu_texture_workload(){
    tiny3d_Project2D();
    tiny3d_SetTextureWrap(0,mode==0?rgba_off:packed_off,W,H,W*(mode==0?4:2),
       mode==0?TINY3D_TEX_FORMAT_A8R8G8B8:
-      mode==1?TINY3D_TEX_FORMAT_R5G6B5:TINY3D_TEX_FORMAT_A1R5G5B5,
+      mode==1||mode==3?TINY3D_TEX_FORMAT_R5G6B5:TINY3D_TEX_FORMAT_A1R5G5B5,
       TEXTWRAP_CLAMP,TEXTWRAP_CLAMP,TEXTURE_LINEAR);
    tiny3d_SetPolygon(TINY3D_QUADS);
    tiny3d_VertexPos(120,80,0);tiny3d_VertexColor(0xFFFFFFFFu);tiny3d_VertexTexture(0,0);
@@ -4008,14 +4045,14 @@ static int v6_gpu_texture_workload(){
    if(total_us>max_total)max_total=total_us;
    total_sum+=total_us;write_sum+=t1-t0;submit_sum+=t2-t1;present_sum+=t3-t2;
    fprintf(f,"%s,%s,%u,%d,%llu,%llu,%llu,%llu,%u,native_texture_binding\n",
-     mode==0?"RGBA8888":mode==1?"RGB565":"ARGB1555",
-     mode==0?"RGBA8888":mode==1?"RGB565":"A1R5G5B5",
+     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"ARGB1555":"DXT1_decoded_RGB565",
+     mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":"RGB565",
      W*H*(mode==0?4:2),rep,(unsigned long long)(t1-t0),
      (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),
      (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL));
   }
   if(summary)fprintf(summary,"%s,%u,%u,%u,%llu,%llu,%llu,%llu,%u\n",
-    mode==0?"RGBA8888":mode==1?"RGB565":"A1R5G5B5",
+    mode==0?"RGBA8888":mode==1?"RGB565":mode==2?"A1R5G5B5":"DXT1_decoded_RGB565",
     COUNT,over,max_total,total_sum/COUNT,write_sum/COUNT,
     submit_sum/COUNT,present_sum/COUNT,W*H*(mode==0?4:2));
  }
@@ -4026,6 +4063,7 @@ static int v6_gpu_texture_workload(){
   if(ferror(summary))summary_ok=0;
   if(fclose(summary)!=0)summary_ok=0;
  }
+ free(dxt1);
  fprintf(f,"BC1_DXT1,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fprintf(f,"BC3_DXT5,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  int ok=!ferror(f);
