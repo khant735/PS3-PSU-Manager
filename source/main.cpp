@@ -2715,7 +2715,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
 static void v6_save(){
  if(!v6_pending)return;
  unsigned scene=v6_pending;v6_pending=0;
- const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":scene==23?"p10_reference":scene==24?"p14_row_backgrounds":scene==25?"p14_row_icons":scene==26?"p14_row_text":scene==27?"p14_rows_combined":scene==28?"p14_full_browser":"p14_reference";
+ const char *base=scene==1?"main_menu":scene==2?"icn_preview":scene==3?"static_scene":scene==4?"checkerboard_scene":scene==5?"full_ui_scene":scene==6?"panels_only":scene==7?"panels_rows":scene==8?"panels_rows_text":scene==9?"complete_ui":scene==10?"p8_rectangles":scene==11?"p8_rounded":scene==12?"p8_gradients":scene==13?"p8_text":scene==14?"p8_combined":scene==15?"p9_reference":scene==16?"p9_browser_no_background":scene==17?"p9_browser_normal":scene==18?"p10_solid":scene==19?"p10_initialized":scene==20?"p10_textured":scene==21?"p10_state_reset":scene==22?"p10_rsx_timing":scene==23?"p10_reference":scene==24?"p15_shell_no_rows":scene==25?"p15_background_text":scene==26?"p15_icons_text":scene==27?"p15_combined_rows":scene==28?"p15_full_browser":"p15_reference";
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char csv[256],txt[256];mkdir(dir,0777);
  snprintf(csv,sizeof(csv),"%s/%s.csv",dir,base);
@@ -4008,13 +4008,18 @@ static void draw(){
  int icon_space=icon_size+18;
  int saved_selected_for_cache=selected;
  selected=-1; /* render stable unselected rows once; selection becomes an overlay */
+ /* Phase 15 A: shell only; retain normal synchronized flip. */
+ if(p11_browser==24){
+  rsx_flush_text_batch();rsx_flush_rect_batch();rsx_flush_line_batch();
+  g_rsx_ui_overlay=0;present();g_frame_counter++;return;
+ }
  for(int row=0;row<visible;row++){
   int i=top_index+row; if(i>=item_count)break;
   int copied=0;
   if(!archive_mode&&clipboard[0]){char item_path[PATHSZ];join(item_path,sizeof(item_path),cwd,items[i].name);copied=!strcmp(item_path,clipboard);}
   int yy=rows_y+row*g_row_h;
   int row_x=g_list_x-8,row_w=list_right-row_x-12;
-  if(p11_browser==24 || p11_browser==27 || p11_browser==28) {
+  if(p11_browser==25 || p11_browser==27 || p11_browser==28) {
   if(i==selected){
    round_rect(row_x,yy-4,row_w,g_row_h,5,archive_mode&&export_target_active?0xFFA46C24u:0xFF215F8Cu);
    rect(row_x+1,yy-3,4,g_row_h-2,archive_mode&&export_target_active?0xFFFFCF6Cu:0xFF79D6FFu);
@@ -4030,10 +4035,10 @@ static void draw(){
   int text_area=date_right-date_col_w-g_list_x-icon_space-14;
   int name_chars=text_area/scale125(6*g_body_scale)-1; if(name_chars<6)name_chars=6;
   int icon_y=yy+4;
-  if(p11_browser==25 || p11_browser==27 || p11_browser==28) {
+  if(p11_browser==26 || p11_browser==27 || p11_browser==28) {
   if(items[i].is_dir)draw_folder_icon(g_list_x+5,icon_y,icon_size,i==selected); else {const u32 *thumb=archive_mode?NULL:browser_archive_thumb(items[i].name);if(thumb)draw_texture_scaled(g_list_x+5,icon_y,128,128,thumb);else draw_file_icon(g_list_x+5,icon_y,icon_size,items[i].name,i==selected);}
   }
-  if(p11_browser==26 || p11_browser==27 || p11_browser==28) {
+  if(p11_browser>=25 && p11_browser<=28) {
   char namebuf[320]; snprintf(namebuf,sizeof(namebuf),"%-*.*s",name_chars,name_chars,items[i].name);
   text(g_list_x+icon_space+5,yy,namebuf,c,g_body_scale);
   text(date_right-datew,yy,datebuf,i==selected?0xFFFFFFFFu:0xFFB8C6D3u,g_body_scale);
@@ -4042,7 +4047,7 @@ static void draw(){
  }
  selected=saved_selected_for_cache;
  if(!g_rsx_ui_overlay) capture_list_base(g_list_x-8,rows_y-4,list_right-(g_list_x-8)-12,visible*g_row_h+8);
- if((p11_browser==27||p11_browser==28) && selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
+ if((p11_browser==25||p11_browser==27||p11_browser==28) && selected>=top_index&&selected<top_index+visible)draw_selection_overlay(selected-top_index);
  g_list_prev_selected=selected;
  g_list_prev_top=top_index;
  perf_t1=fps_now_us(); perf_avg(&g_perf_list_ms,perf_ms(perf_t0,perf_t1)); perf_t0=perf_t1; g_5c_off[3]=phase5c_cmd_off(); g_5c_stage=3;
