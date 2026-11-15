@@ -3961,21 +3961,25 @@ static void v6_gpu_texture_workload(){
  fprintf(f,"source_format,gpu_binding,texture_bytes,frame,texture_write_cpu_us,submit_cpu_us,present_wall_us,total_wall_us,over_16667us,status\n");
  enum {W=128,H=128,COUNT=24};
  u32 *pixels=(u32*)tiny3d_AllocTexture(W*H*4);
- if(!pixels){fprintf(f,"RGBA8888,RGBA8888,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
- const u32 off=tiny3d_TextureOffset(pixels);
+ u16 *packed=(u16*)tiny3d_AllocTexture(W*H*2);
+ if(!pixels||!packed){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
+ const u32 rgba_off=tiny3d_TextureOffset(pixels);
+ const u32 packed_off=tiny3d_TextureOffset(packed);
  for(int mode=0;mode<3;mode++){
   for(int rep=0;rep<COUNT;rep++){
    unsigned long long t0=fps_now_us();
    for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
     unsigned rr=x*2u,gg=y*2u,bb=(x^y)*2u;
-    if(mode==1){rr=(rr&248u)|(rr>>5);gg=(gg&252u)|(gg>>6);bb=(bb&248u)|(bb>>5);}
-    if(mode==2){rr=(rr&248u)|(rr>>5);gg=(gg&248u)|(gg>>5);bb=(bb&248u)|(bb>>5);}
-    pixels[y*W+x]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
+    if(mode==0) pixels[y*W+x]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
+    else if(mode==1) packed[y*W+x]=(u16)(((rr>>3)<<11)|((gg>>2)<<5)|(bb>>3));
+    else packed[y*W+x]=(u16)(0x8000u|((rr>>3)<<10)|((gg>>3)<<5)|(bb>>3));
    }
    unsigned long long t1=fps_now_us();
    tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
    tiny3d_Project2D();
-   tiny3d_SetTextureWrap(0,off,W,H,W*4,TINY3D_TEX_FORMAT_A8R8G8B8,
+   tiny3d_SetTextureWrap(0,mode==0?rgba_off:packed_off,W,H,W*(mode==0?4:2),
+      mode==0?TINY3D_TEX_FORMAT_A8R8G8B8:
+      mode==1?TINY3D_TEX_FORMAT_R5G6B5:TINY3D_TEX_FORMAT_A1R5G5B5,
       TEXTWRAP_CLAMP,TEXTWRAP_CLAMP,TEXTURE_LINEAR);
    tiny3d_SetPolygon(TINY3D_QUADS);
    tiny3d_VertexPos(120,80,0);tiny3d_VertexColor(0xFFFFFFFFu);tiny3d_VertexTexture(0,0);
@@ -3987,9 +3991,10 @@ static void v6_gpu_texture_workload(){
    present();
    g_frame_counter++;
    unsigned long long t3=fps_now_us();
-   fprintf(f,"%s,RGBA8888,%u,%d,%llu,%llu,%llu,%llu,%u,measured_native_RGBA_binding\n",
-     mode==0?"RGBA8888":mode==1?"RGB565_expanded": "ARGB1555_expanded",
-     W*H*4,rep,(unsigned long long)(t1-t0),
+   fprintf(f,"%s,%s,%u,%d,%llu,%llu,%llu,%llu,%u,native_texture_binding\n",
+     mode==0?"RGBA8888":mode==1?"RGB565":"ARGB1555",
+     mode==0?"RGBA8888":mode==1?"RGB565":"A1R5G5B5",
+     W*H*(mode==0?4:2),rep,(unsigned long long)(t1-t0),
      (unsigned long long)(t2-t1),(unsigned long long)(t3-t2),
      (unsigned long long)(t3-t0),(unsigned)(t3-t0>16667ULL));
   }
