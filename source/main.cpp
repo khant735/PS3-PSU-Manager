@@ -794,7 +794,8 @@ static void rsx_flush_text_batch(){
   if(fw<1.0f)fw=1.0f;if(fh<1.0f)fh=1.0f;
   float x=q->x*sx,y=q->y*sy; u32 rgba=rsx_rgba_from_argb(q->col);
   for(const unsigned char *sp=(const unsigned char*)q->s;*sp;sp++,x+=fw){
-   int c=*sp;if(c<32||c>126)c='?';int gi=c-32,gx=(gi&15)*8,gy=(gi>>4)*8;
+   int c=*sp;if(c==' ')continue; /* Blank atlas cell: no visible pixels, skip quad. */
+   if(c<32||c>126)c='?';int gi=c-32,gx=(gi&15)*8,gy=(gi>>4)*8;
    float u0=(float)gx/RSX_FONT_ATLAS_W,v0=(float)gy/RSX_FONT_ATLAS_H;
    /* Only sample the legacy 6-pixel-wide character cell (5 glyph pixels +
       1 spacing column).  Sampling the full 8-pixel atlas slot into a 6-pixel
