@@ -2185,7 +2185,9 @@ static int ensure_model_vertex_buffers(int n){
  g_model_sx=sx;g_model_sy=sy;g_model_zinv=zi;g_model_nx=nx;g_model_ny=ny;g_model_vertex_cap=cap;return 1;
 }
 static void restore_model_base_to_buffer(u32 *dst);
+static u32 v6_icn_draw_calls=0,v6_icn_blit_calls=0;
 static void blit_model_cache(int box_x,int box_y,int box_w,int box_h){
+ ++v6_icn_blit_calls;
  if(!g_model_cache||!g_model_cache_valid||box_w<=0||box_h<=0)return;
  if(g_rsx_ui_overlay){
   rsx_preview_tex_init();if(!g_rsx_preview_tex_ready)return;
@@ -2340,6 +2342,7 @@ static inline u32 blend_rgb_lod(u32 a,u32 b,int t){
  return 0xFF000000u|(r<<16)|(g<<8)|bl;
 }
 static void draw_textured_model(int box_x,int box_y,int box_w,int box_h){
+ ++v6_icn_draw_calls;
  if(!g_preview.valid||!g_preview.positions||!g_preview.uvs||box_w<40||box_h<40)return;
  /* Adaptive true raster resolution.  Simple and moderate ICNs get substantially
     more real geometry pixels; only heavy meshes fall back to the compact path. */
@@ -2674,9 +2677,10 @@ static u32 v6_uploads=0,v6_upload_bytes=0;
 static int v6_static_started=0;
 static unsigned long long v6_static_start_us=0;
 static void v6_note_upload(u32 bytes){++v6_uploads;v6_upload_bytes+=bytes;}
+
 /* Stage 6V 30s dual capture: frame sampling is RAM-only; save after window. */
 #define V6_MAX 4096
-typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;u32 preview_valid,preview_cache_valid,preview_active;u32 status_changes,status_first,status_last,first_change_offset_us,last_change_offset_us;} v6_row;
+typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;u32 preview_valid,preview_cache_valid,preview_active,icn_draw_calls,icn_blit_calls;u32 status_changes,status_first,status_last,first_change_offset_us,last_change_offset_us;} v6_row;
 static v6_row v6_rows[V6_MAX];
 static unsigned v6_n=0,v6_active=0,v6_pending=0,v6_done=0,v6_overflow=0;
 static unsigned long long v6_begin=0,v6_prev=0;
@@ -2713,6 +2717,7 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
   p->tail_us=(g_4x_waitcmd_end_us&&now>=g_4x_waitcmd_end_us)?(u32)(now-g_4x_waitcmd_end_us):0;
   p->polls=g_4x_status_polls;p->callbacks=g_5b_cb_count;
   p->buffer_before=v6_buffer_before;p->buffer_after=v6_buffer_after;
+  p->icn_draw_calls=v6_icn_draw_calls;p->icn_blit_calls=v6_icn_blit_calls;
   p->preview_valid=g_preview.valid?1u:0u;p->preview_cache_valid=g_model_cache_valid?1u:0u;
   p->preview_active=(archive_mode&&item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&preview_entry_is_standard_icn(items[selected].name))?1u:0u;
   p->status_changes=g_16_status_changes;p->status_first=g_16_first_status;p->status_last=g_16_last_status;
@@ -2816,6 +2821,14 @@ static void v6_save(){
    if(p->preview_active)++active_preview_frames;
    else {if(p->preview_valid)++inactive_preview_valid;if(p->preview_cache_valid)++inactive_preview_cache;}
   }
+  unsigned inactive_icn_draws=0,inactive_icn_blits=0,active_icn_draws=0,active_icn_blits=0;
+  for(unsigned i=1;i<v6_n;i++){
+   const v6_row *p=&v6_rows[i];
+   if(p->preview_active){active_icn_draws+=p->icn_draw_calls;active_icn_blits+=p->icn_blit_calls;}
+   else {inactive_icn_draws+=p->icn_draw_calls;inactive_icn_blits+=p->icn_blit_calls;}
+  }
+  fprintf(f,"ICN draw calls while inactive: %u\\nICN cache blits while inactive: %u\\nICN draw calls while active: %u\\nICN cache blits while active: %u\\n",
+    inactive_icn_draws,inactive_icn_blits,active_icn_draws,active_icn_blits);
   fprintf(f,"Active 3D ICN preview frames: %u\nInactive preview with valid model state: %u\nInactive preview with cached model: %u\n",
     active_preview_frames,inactive_preview_valid,inactive_preview_cache);
   /* Separate first-five-second statistics to expose transition-only stalls. */
@@ -3793,7 +3806,7 @@ static int draw_psu_metadata_rsx_frame(){
 static void draw_downloader_progress();
 static void draw(){
  g_perf_draw_begin_us=fps_now_us();
- v6_uploads=0;v6_upload_bytes=0;
+ v6_uploads=0;v6_upload_bytes=0;v6_icn_draw_calls=0;v6_icn_blit_calls=0;
  /* First diagnostic window: static background through normal Tiny3D flip.
     Scene ends only after v6_capture has marked its 30-second window done. */
  if(!v6_static_started){v6_static_started=1;v6_static_start_us=g_perf_draw_begin_us;}
