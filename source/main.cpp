@@ -3953,6 +3953,7 @@ static void v6_texture_format_benchmark(){
    This measures real RSX upload/bind/draw/present with a supported RGBA8888
    texture. Packed formats are CPU-expanded to RGBA and labelled accordingly;
    no unverified native DXT bindings are issued. */
+static void present();
 static void v6_gpu_texture_workload(){
  const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
  char path[256];snprintf(path,sizeof(path),"%s/texture_gpu_workload.csv",dir);
