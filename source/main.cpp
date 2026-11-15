@@ -3849,6 +3849,80 @@ static int draw_psu_metadata_rsx_frame(){
  return 1;
 }
 static void draw_downloader_progress();
+/* Unattended CPU texture-format and lossless RLE benchmark.
+   Runs only after all timed scenes; never alters production textures or RSX state.
+   BC1/BC3 are NOT claimed supported without an RSX binding/visual test. */
+static void v6_texture_format_benchmark(){
+ const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
+ mkdir(dir,0777);
+ char path[256];snprintf(path,sizeof(path),"%s/texture_format_cpu_benchmark.csv",dir);
+ FILE *f=fopen(path,"wb");if(!f)return;
+ enum {N=128*128,REPS=64};
+ u32 *src=(u32*)malloc(N*4u);
+ u32 *dst=(u32*)malloc(N*4u);
+ unsigned short *packed=(unsigned short*)malloc(N*2u);
+ unsigned char *rle=(unsigned char*)malloc(N*5u);
+ if(!src||!dst||!packed||!rle){
+  fprintf(f,"error,allocation_failed\\n");fclose(f);
+  free(src);free(dst);free(packed);free(rle);return;
+ }
+ for(unsigned i=0;i<N;i++){
+  unsigned x=i%128u,y=i/128u;
+  src[i]=0xFF000000u|((x*2u)<<16)|((y*2u)<<8)|((x^y)*2u);
+ }
+ fprintf(f,"format,bytes_per_texture,encode_total_us,decode_total_us,roundtrip_mismatched_pixels,iterations,notes\\n");
+ for(unsigned fmt=0;fmt<4;fmt++){
+  unsigned long long t0=fps_now_us(),t1,t2;
+  unsigned mismatches=0,bytes=N*4u;
+  if(fmt==0){
+   for(int rep=0;rep<REPS;rep++)memcpy(dst,src,N*4u);
+   t1=fps_now_us();t2=t1;
+  }else if(fmt==1||fmt==2){
+   bytes=N*2u;
+   for(int rep=0;rep<REPS;rep++)for(unsigned i=0;i<N;i++){
+    u32 c=src[i],rr=(c>>16)&255u,gg=(c>>8)&255u,bb=c&255u;
+    packed[i]=(fmt==1)?(unsigned short)(((rr>>3)<<11)|((gg>>2)<<5)|(bb>>3)):
+     (unsigned short)(0x8000u|((rr>>3)<<10)|((gg>>3)<<5)|(bb>>3));
+   }
+   t1=fps_now_us();
+   for(int rep=0;rep<REPS;rep++)for(unsigned i=0;i<N;i++){
+    unsigned c=packed[i],rr,gg,bb;
+    if(fmt==1){rr=(c>>11)&31u;gg=(c>>5)&63u;bb=c&31u;gg=(gg<<2)|(gg>>4);}
+    else {rr=(c>>10)&31u;gg=(c>>5)&31u;bb=c&31u;gg=(gg<<3)|(gg>>2);}
+    rr=(rr<<3)|(rr>>2);bb=(bb<<3)|(bb>>2);
+    dst[i]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
+   }
+   t2=fps_now_us();
+  }else{
+   /* Deterministic byte-run RLE, lossless CPU compression reference only. */
+   unsigned char *in=(unsigned char*)src;
+   unsigned outn=0;
+   for(int rep=0;rep<REPS;rep++){
+    outn=0;
+    for(unsigned i=0;i<N*4u;){
+     unsigned run=1;while(run<255u&&i+run<N*4u&&in[i+run]==in[i])run++;
+     rle[outn++]=(unsigned char)run;rle[outn++]=in[i];i+=run;
+    }
+   }
+   bytes=outn;t1=fps_now_us();
+   for(int rep=0;rep<REPS;rep++){
+    unsigned pos=0;
+    for(unsigned i=0;i<outn;i+=2){
+     unsigned run=rle[i];memset(((unsigned char*)dst)+pos,rle[i+1],run);pos+=run;
+    }
+   }
+   t2=fps_now_us();
+  }
+  for(unsigned i=0;i<N;i++)if(src[i]!=dst[i])mismatches++;
+  fprintf(f,"%s,%u,%llu,%llu,%u,%u,%s\\n",
+   fmt==0?"RGBA8888":fmt==1?"RGB565":fmt==2?"ARGB1555":"RLE_lossless_CPU",
+   bytes,(unsigned long long)(t1-t0),(unsigned long long)(t2-t1),
+   mismatches,REPS,fmt==3?"CPU_reference_not_RSX_texture_format":"CPU_conversion_not_GPU_sampling");
+ }
+ fprintf(f,"BC1_DXT1,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\\n");
+ fprintf(f,"BC3_DXT5,0,0,0,0,0,not_tested_requires_verified_RSX_texture_support\\n");
+ fclose(f);free(src);free(dst);free(packed);free(rle);
+}
 static void draw(){
  g_perf_draw_begin_us=fps_now_us();
  v6_uploads=0;v6_upload_bytes=0;v6_icn_draw_calls=0;v6_icn_blit_calls=0;
@@ -3862,6 +3936,7 @@ static void draw(){
   static int unattended_manifest_written=0;
   if(!unattended_manifest_written){
    unattended_manifest_written=1;
+   v6_texture_format_benchmark();
    const char *dir="/dev_hdd0/tmp/ps3psu_stage6v";
    mkdir(dir,0777);
    char marker[256];snprintf(marker,sizeof(marker),"%s/automatic_run_complete.txt",dir);
