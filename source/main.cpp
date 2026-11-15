@@ -2676,7 +2676,7 @@ static unsigned long long v6_static_start_us=0;
 static void v6_note_upload(u32 bytes){++v6_uploads;v6_upload_bytes+=bytes;}
 /* Stage 6V 30s dual capture: frame sampling is RAM-only; save after window. */
 #define V6_MAX 4096
-typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;u32 status_changes,status_first,status_last,first_change_offset_us,last_change_offset_us;} v6_row;
+typedef struct {u32 frame,dt,draw,flip,get,put,vb,status;u32 pre_get,pre_put,post_get,post_put;u32 poll_us,queue_us,waitcmd_us,tail_us;u32 polls,callbacks;u32 buffer_before,buffer_after;u32 draw_bg_us,draw_list_us,draw_preview_us;u32 uploads,upload_bytes;u32 preview_valid,preview_cache_valid,preview_active;u32 status_changes,status_first,status_last,first_change_offset_us,last_change_offset_us;} v6_row;
 static v6_row v6_rows[V6_MAX];
 static unsigned v6_n=0,v6_active=0,v6_pending=0,v6_done=0,v6_overflow=0;
 static unsigned long long v6_begin=0,v6_prev=0;
@@ -2713,6 +2713,8 @@ static void v6_capture(unsigned long long now,unsigned long long before,unsigned
   p->tail_us=(g_4x_waitcmd_end_us&&now>=g_4x_waitcmd_end_us)?(u32)(now-g_4x_waitcmd_end_us):0;
   p->polls=g_4x_status_polls;p->callbacks=g_5b_cb_count;
   p->buffer_before=v6_buffer_before;p->buffer_after=v6_buffer_after;
+  p->preview_valid=g_preview.valid?1u:0u;p->preview_cache_valid=g_model_cache_valid?1u:0u;
+  p->preview_active=(archive_mode&&item_count>0&&selected>=0&&selected<item_count&&!items[selected].is_dir&&preview_entry_is_standard_icn(items[selected].name))?1u:0u;
   p->status_changes=g_16_status_changes;p->status_first=g_16_first_status;p->status_last=g_16_last_status;
   p->first_change_offset_us=(g_16_first_change_us>=g_4x_flip_enter_us)?(u32)(g_16_first_change_us-g_4x_flip_enter_us):0;
   p->last_change_offset_us=(g_16_last_change_us>=g_4x_flip_enter_us)?(u32)(g_16_last_change_us-g_4x_flip_enter_us):0;
@@ -2805,9 +2807,17 @@ static void v6_save(){
     if(p->upload_bytes>max_upload_bytes)max_upload_bytes=p->upload_bytes;
    }
   }
-  fprintf(f,"60 FPS budget: 16.667 ms (16667 us)\\nFrames over 60 FPS budget: %u / %u\\nFrames below 22 instantaneous FPS: %u\\nFrames with texture uploads: %u\\nUpload frames over budget: %u\\nTotal recorded upload bytes: %llu\\nMax bytes uploaded in one frame: %u\\n",
+  fprintf(f,"60 FPS budget: 16.667 ms (16667 us)\nFrames over 60 FPS budget: %u / %u\nFrames below 22 instantaneous FPS: %u\nFrames with texture uploads: %u\nUpload frames over budget: %u\nTotal recorded upload bytes: %llu\nMax bytes uploaded in one frame: %u\n",
     over_budget,v6_n>1?v6_n-1:0,over_22fps,upload_frames,upload_over_budget,upload_total_bytes,max_upload_bytes);
 
+  unsigned inactive_preview_valid=0,inactive_preview_cache=0,active_preview_frames=0;
+  for(unsigned i=1;i<v6_n;i++){
+   const v6_row *p=&v6_rows[i];
+   if(p->preview_active)++active_preview_frames;
+   else {if(p->preview_valid)++inactive_preview_valid;if(p->preview_cache_valid)++inactive_preview_cache;}
+  }
+  fprintf(f,"Active 3D ICN preview frames: %u\nInactive preview with valid model state: %u\nInactive preview with cached model: %u\n",
+    active_preview_frames,inactive_preview_valid,inactive_preview_cache);
   /* Separate first-five-second statistics to expose transition-only stalls. */
   unsigned long long startup_us=0,start_draw=0,start_flip=0;
   unsigned startup_frames=0,start_stalls=0;
