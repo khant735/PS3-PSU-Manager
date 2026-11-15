@@ -2805,7 +2805,7 @@ static void v6_save(){
     if(p->upload_bytes>max_upload_bytes)max_upload_bytes=p->upload_bytes;
    }
   }
-  fprintf(f,"60 FPS budget: 16.667 ms (16667 us)\nFrames over 60 FPS budget: %u / %u\nFrames below 22 instantaneous FPS: %u\nFrames with texture uploads: %u\nUpload frames over budget: %u\nTotal recorded upload bytes: %llu\nMax bytes uploaded in one frame: %u\n",
+  fprintf(f,"60 FPS budget: 16.667 ms (16667 us)\\nFrames over 60 FPS budget: %u / %u\\nFrames below 22 instantaneous FPS: %u\\nFrames with texture uploads: %u\\nUpload frames over budget: %u\\nTotal recorded upload bytes: %llu\\nMax bytes uploaded in one frame: %u\\n",
     over_budget,v6_n>1?v6_n-1:0,over_22fps,upload_frames,upload_over_budget,upload_total_bytes,max_upload_bytes);
 
   /* Separate first-five-second statistics to expose transition-only stalls. */
