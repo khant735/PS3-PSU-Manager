@@ -4042,9 +4042,17 @@ static int v6_font_render_workload(){
   "PS2 3D ICON PREVIEW   FILE BROWSER ROWS"
  };
  const unsigned line_count=sizeof(lines)/sizeof(lines[0]);
- const int repeats=24;
+ const int repeats=120;
+ char summary_path[256];snprintf(summary_path,sizeof(summary_path),"%s/font_render_summary.csv",dir);
+ FILE *summary=fopen(summary_path,"wb");
+ if(summary)fprintf(summary,"mode,frames,over_16667us,max_frame_interval_us,mean_frame_interval_us,mean_submit_us,mean_present_us,atlas_bytes,status\n");
+ /* Ensure that the atlas path is not silently disabled by the scene suite. */
+ int old_hide=g_v6_hide_text;g_v6_hide_text=0;
  volatile unsigned legacy_pixels=0;
- for(int mode=0;mode<3;mode++)for(int rep=0;rep<repeats;rep++){
+ for(int mode=0;mode<3;mode++){
+  unsigned overruns=0,max_us=0;
+  unsigned long long frame_sum=0,submit_sum=0,present_sum=0;
+  for(int rep=0;rep<repeats;rep++){
   unsigned long long t0=fps_now_us();
   unsigned glyphs=0,commands=0,flushes=0;
   g_perf_draw_begin_us=t0;
@@ -4070,6 +4078,10 @@ static int v6_font_render_workload(){
   unsigned long long t2=fps_now_us();
   present();g_frame_counter++;
   unsigned long long t3=fps_now_us();
+  unsigned elapsed=(unsigned)(t3-t0);
+  if(elapsed>16667u)overruns++;
+  if(elapsed>max_us)max_us=elapsed;
+  frame_sum+=elapsed;submit_sum+=t2-t1;present_sum+=t3-t2;
   fprintf(f,"%s,%d,%u,%u,%u,%u,%llu,%llu,%llu,%llu,%u,%s\n",
    mode==0?"atlas_batched":mode==1?"atlas_forced_flush":"legacy_glyph_CPU_only",
    rep,glyphs,commands,flushes,RSX_FONT_ATLAS_W*RSX_FONT_ATLAS_H*4,
@@ -4077,8 +4089,16 @@ static int v6_font_render_workload(){
    (unsigned long long)(t3-t2),(unsigned long long)(t3-t0),
    (unsigned)(t3-t0>16667ULL),
    mode==2?"CPU_reference_not_GPU_equivalent":"RSX_atlas_rendered");
+  }
+  if(summary)fprintf(summary,"%s,%d,%u,%u,%llu,%llu,%llu,%u,%s\n",
+   mode==0?"atlas_batched":mode==1?"atlas_forced_flush":"legacy_glyph_CPU_only",
+   repeats,overruns,max_us,frame_sum/repeats,submit_sum/repeats,present_sum/repeats,
+   RSX_FONT_ATLAS_W*RSX_FONT_ATLAS_H*4,
+   mode==2?"CPU_reference_not_GPU_equivalent":"RSX_atlas_rendered");
  }
+ g_v6_hide_text=old_hide;
  int ok=!ferror(f);if(fclose(f)!=0)ok=0;
+ if(!summary)ok=0;else {if(ferror(summary))ok=0;if(fclose(summary)!=0)ok=0;}
  (void)legacy_pixels;
  return ok;
 }
