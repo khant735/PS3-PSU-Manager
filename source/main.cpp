@@ -3965,6 +3965,8 @@ static void v6_gpu_texture_workload(){
  if(!pixels||!packed){fprintf(f,"all,none,0,0,0,0,0,0,0,allocation_failed\n");fclose(f);return;}
  const u32 rgba_off=tiny3d_TextureOffset(pixels);
  const u32 packed_off=tiny3d_TextureOffset(packed);
+ /* A single native-format buffer is reused sequentially. Record the exact
+    allocation sizes and do not present untested DXT as successful. */
  char summary_path[256];
  snprintf(summary_path,sizeof(summary_path),"%s/texture_gpu_summary.csv",dir);
  FILE *summary=fopen(summary_path,"wb");
@@ -3982,6 +3984,8 @@ static void v6_gpu_texture_workload(){
     else packed[y*W+x]=(u16)(0x8000u|((rr>>3)<<10)|((gg>>3)<<5)|(bb>>3));
    }
    unsigned long long t1=fps_now_us();
+   /* End any previous texture consumers before overwriting the same RSX
+      allocation. tiny3d_Flip() has returned from the preceding iteration. */
    tiny3d_Clear(0x000000FFu,TINY3D_CLEAR_ALL);
    tiny3d_Project2D();
    tiny3d_SetTextureWrap(0,mode==0?rgba_off:packed_off,W,H,W*(mode==0?4:2),
