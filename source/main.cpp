@@ -3974,6 +3974,7 @@ static void v6_gpu_texture_workload(){
   unsigned long long total_sum=0,write_sum=0,submit_sum=0,present_sum=0;
   for(int rep=0;rep<COUNT;rep++){
    unsigned long long t0=fps_now_us();
+   g_perf_draw_begin_us=t0;
    for(unsigned y=0;y<H;y++)for(unsigned x=0;x<W;x++){
     unsigned rr=x*2u,gg=y*2u,bb=(x^y)*2u;
     if(mode==0) pixels[y*W+x]=0xFF000000u|(rr<<16)|(gg<<8)|bb;
@@ -4013,7 +4014,12 @@ static void v6_gpu_texture_workload(){
     COUNT,over,max_total,total_sum/COUNT,write_sum/COUNT,
     submit_sum/COUNT,present_sum/COUNT,W*H*(mode==0?4:2));
  }
- if(summary){fprintf(summary,"BC1_DXT1,0,0,0,0,0,0,0,0\nBC3_DXT5,0,0,0,0,0,0,0,0\n");fclose(summary);}
+ if(summary){
+  /* Explicitly distinguish unsupported bindings from a zero-time result. */
+  fprintf(summary,"BC1_DXT1,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
+  fprintf(summary,"BC3_DXT5,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested,not_tested\n");
+  fclose(summary);
+ }
  fprintf(f,"BC1_DXT1,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fprintf(f,"BC3_DXT5,native_not_verified,0,0,0,0,0,0,0,not_tested\n");
  fclose(f);
